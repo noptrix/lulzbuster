@@ -84,6 +84,6 @@ noptrix
 # Disclaimer
 
 We hereby emphasize, that the hacking related stuff found on
-[nullsecurity.net](https://nullsecurity.net) are only for education purposes.
+[nullsecurity.net](http://nullsecurity.net) are only for education purposes.
 We are not responsible for any damages. You are responsible for your own
 actions.
