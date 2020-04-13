@@ -79,11 +79,7 @@ noptrix
 
 # Notes
 
-My public tools are officially announced and published via [nullsecurity.net](https://www.nullsecurity.net).
-
-# Distros
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/lulzbuster.svg)](https://repology.org/project/lulzbuster/versions)
+- All of my public stuff you find are officially announced and published via [nullsecurity.net](https://www.nullsecurity.net).
 
 # Disclaimer
 
