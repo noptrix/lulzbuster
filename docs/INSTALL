@@ -1,0 +1,18 @@
+requirements
+============
+
+  - libcurl >= 7.62.0
+  - brain = 1337
+
+
+build / install
+===============
+
+  - make lulzbuster # build
+  - sudo make install # install
+
+uninstall
+=========
+
+  - make uninstall
+

@@ -1,0 +1,81 @@
+ChangeLog and TODO list for lulzbuster
+======================================
+
+[ ] to be implemented
+[.] in progress
+[x] implemented
+[-] canceled
+
+
+===> 1.X.X
+
+  [ ] update: count newlines, words and print them in stat line (smart mode)
+  [ ] new feature: fuzz given placeholder in the URL with wordlist(s) (fuzzing)
+  [ ] new feature: add regex/option to specify a custom 404-page
+  [ ] update: double check (start must equal end) (smart mode)
+  [ ] new feature: build statistics during scan and print them at the end
+  [ ] new feature: recursive scan + exclude given directories
+  [ ] new feature: save and restore session after 'ctrl+c'
+  [ ] attack.c: attack(): collect hits table. if 200 was given with same size
+      over X times -> claim false-positive (smart mode)
+  [ ] http.c: do_req(): handle errors in a pragmatic way: count for X errors and
+      then offer something to do as next or give up
+  [ ] really, clean up and refactor the code a bit where necessary
+
+
+===> 1.3.2
+
+  [x] add sigaction() wrapper and signal handlers for later usage
+
+
+===> 1.3.1
+
+  [x] remove forgotten escape sequence char when loggin to file
+
+
+===> 1.3.0
+
+  [x] do wildcard check for any HTTP resp. code except 404
+  [x] skip 0 bytes size files/dirs
+  [x] remove count_lines() since not needed anymore
+
+
+===> 1.2.0
+
+  [x] update: clean-up lists/*.txt (removed words with spaces)
+  [x] update: use libcurl's dns cache forever
+  [-] make fast if '-f' option was used. (handle 301 codes correctly). we
+      probably would need to fetch location header and build/set new url :s
+  [x] update: add headline prior hit line
+  [x] update: add response time to stat line
+  [x] update: just for testing: let's get rid of pthread locks in attack.c for
+              curl internals and see how it goes in future
+  [x] update: get rid of count_lines() in misc.c (not needed since we count
+              already # of lines in read_lines())
+  [x] update: show also real size in bytes next to calculated size
+  [x] bugfix: fix a stupid bug at fclose()
+  [x] update: log also on stderr while '-l' was chosen
+  [x] update: update default excluded http status codes to:
+              400,404,500,501,502,503
+  [x] update: make better LOG functions and define them clearly so we can use it
+              everywhere at anytime and don't mix shit
+  [x] bugfix: more fixes for wrong color codes
+  [-] update: pack opts_T struct
+
+
+===> 1.1.0
+
+  [x] update: by default, turn off 'auto update referrer' of curl
+  [x] update: count num http ex codes outside of attack.c
+  [x] update: count num attack urls outside of attack.c
+  [x] update: set max line length (1024 bytes) to read from wordlists
+  [x] update: skip the curl-error checks in switch-case in do_req() for now,
+      since we don't use it currently in pragmatic way anyway
+  [x] update: use a few register variables
+  [x] bugfix: fix wrong color reset code
+
+
+===> 1.0.0
+
+  [x] initial release
+
