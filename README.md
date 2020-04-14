@@ -82,7 +82,7 @@ noptrix
 - clean code; real project
 - lulzbuster is already packaged and available for [BlackArch Linux](https://www.blackarch.org/)
 - My master-branches are always stable; dev-branches are created for current work.
-- All of my public stuff you find are officially announced and published via [nullsecurity.net](https://www.nullsecurity.net).
+- All of my public stuff you find are officially announced and published via [nullsecurity.net](https://www.nullsecurity.net/).
 
 # License
 
