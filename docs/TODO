@@ -23,6 +23,11 @@ ChangeLog and TODO list for lulzbuster
   [ ] really, clean up and refactor the code a bit where necessary
 
 
+===> 1.x.x
+
+  [x] fix a typo in help message
+
+
 ===> 1.3.2
 
   [x] add sigaction() wrapper and signal handlers for later usage

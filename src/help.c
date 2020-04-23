@@ -76,7 +76,7 @@ void usage()
   "  -S             - smart mode aka eliminate false-positives, more infos,\n"
   "                   etc. (use this if speed is not your 1st priority!)\n"
   "  -n <str>       - nameservers (default: '1.1.1.1,8.8.8.8,208.67.222.222'\n"
-  "                   multi separated by '.')\n"
+  "                   multi separated by ',')\n"
   "  -l <file>      - log found paths and valid urls to file\n\n"
   CBOLD"misc"CRESET"\n\n"
   "  -X             - print built-in user-agents\n"
