@@ -92,8 +92,8 @@ default:
 
 lulzbuster: $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
-	#$(STRIP) -R .gnu.version -R .note.gnu.build-i -R .note.ABI-tag -g -S -d \
-	#	--strip-debug --strip-dwo -s lulzbuster
+	#$(STRIP) -R .gnu.version -R .note.gnu.build-i -R .note.ABI-tag \
+	#	-R .note.gnu.build-id -g -S -d --strip-debug --strip-dwo -s lulzbuster
 
 install:
 	$(MKDIR) $(INSTDIR)
