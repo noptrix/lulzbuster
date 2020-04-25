@@ -33,8 +33,8 @@ else
 	ECHO = "echo -e"
 endif
 
-RED=$(shell "${ECHO}" "\033[01;91m")
-BLUE=$(shell "${ECHO}" "\033[01;94m")
+RED=$(shell "${ECHO}" "\033[01;31;10m")
+BLUE=$(shell "${ECHO}" "\033[01;34;10m")
 NORM=$(shell "${ECHO}" "\033[0m")
 
 define BANNER
