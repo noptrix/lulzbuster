@@ -6,7 +6,7 @@
 *                                            /___/ team                        *
 *                                                                              *
 * lulzbuster                                                                   *
-* A very fast and smart web-dir/file enumeration tool written in C.            *
+* A very fast and smart web directory and file enumeration tool written in C.  *
 *                                                                              *
 * FILE                                                                         *
 * signals.h                                                                    *

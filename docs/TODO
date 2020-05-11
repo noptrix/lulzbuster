@@ -25,6 +25,7 @@ ChangeLog and TODO list for lulzbuster
 
 ===> 1.x.x
 
+  [x] update short description
   [x] strip more unneeded GNU info symbols from binary
   [x] fix color codes in Makefile
   [x] fix a typo in help message
