@@ -45,7 +45,7 @@ unsigned char set_http_options(opts_T *opts)
   }
 
   /* set dns caching to remain forever */
-  if (curl_easy_setopt(opts->curl->eh, CURLOPT_DNS_CACHE_TIMEOUT, -1L) != \
+  if (curl_easy_setopt(opts->curl->eh, CURLOPT_DNS_CACHE_TIMEOUT, 1L) != \
       CURLE_OK) {
     err(E_CURL_DNSCACHE);
     return FALSE;

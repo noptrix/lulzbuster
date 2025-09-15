@@ -51,7 +51,7 @@
 
 /* cmdline argument check routines */
 void check_argc(int);
-void check_args();
+void check_args(opts_T *);
 
 /* opts check routines */
 void check_opts(opts_T *);
