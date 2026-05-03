@@ -25,8 +25,17 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: env diagnostics
+        run: |
+          uname -a
+          cc --version || true
+          xcrun --show-sdk-path || true
+          ls -l /usr/lib/libcurl* 2>&1 || true
+          ls -l $(xcrun --show-sdk-path)/usr/include/curl 2>&1 || true
+          which make gmake || true
+          make --version | head -1 || true
       - name: build
-        run: make lulzbuster
+        run: set -x; make lulzbuster
       - name: smoke test
         run: ./lulzbuster -V
 
@@ -41,5 +50,11 @@ jobs:
           usesh: true
           prepare: pkg install -y gmake curl
           run: |
+            set -x
+            uname -a
+            cc --version || true
+            which gmake curl
+            gmake --version | head -1
+            ls -l /usr/local/lib/libcurl* /usr/lib/libcurl* 2>&1 || true
             gmake lulzbuster
             ./lulzbuster -V
