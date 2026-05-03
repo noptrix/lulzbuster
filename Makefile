@@ -74,6 +74,13 @@ CFLAGS += -MMD -MP
 CFLAGS += -flto -fno-plt -pipe -DNDEBUG
 CFLAGS += -ffunction-sections -fdata-sections
 
+# *BSD installs ports/pkgs (incl. libcurl) under /usr/local. cc doesn't
+# search there by default, so add the include path now (LDFLAGS' -L is
+# appended further down once LDFLAGS itself is initialized)
+ifneq (,$(filter FreeBSD OpenBSD NetBSD DragonFly,$(UNAME_S)))
+  CFLAGS += -I/usr/local/include
+endif
+
 # dev/debug build (uncomment to enable). includes ASan, fortify-source,
 # stack protector, RELRO/now, full debug info. slower + larger but
 # catches memory bugs and gives readable backtraces
@@ -84,10 +91,16 @@ CFLAGS += -ffunction-sections -fdata-sections
 
 # linker dead-code stripping: GNU/BSD use --gc-sections, macOS uses
 # -dead_strip (apple's ld doesn't grok --gc-sections)
+LDFLAGS = -lcurl -flto
 ifeq ($(UNAME_S),Darwin)
-  LDFLAGS = -lcurl -Wl,-dead_strip -flto
+  LDFLAGS += -Wl,-dead_strip
 else
-  LDFLAGS = -lcurl -Wl,--gc-sections -flto
+  LDFLAGS += -Wl,--gc-sections
+endif
+
+# *BSD libcurl lives under /usr/local/lib (see CFLAGS path comment above)
+ifneq (,$(filter FreeBSD OpenBSD NetBSD DragonFly,$(UNAME_S)))
+  LDFLAGS += -L/usr/local/lib
 endif
 
 # strip flag dialect: GNU binutils on linux supports the long options +
