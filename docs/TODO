@@ -44,6 +44,8 @@ ChangeLog and TODO list for lulzbuster
   [x] new feature
       mTLS client cert support: -E cert, -y key, -Y key passphrase
   [x] update
+      added support for *BSD + MacOS
+  [x] update
       -O for log/csv/jsonl/all/comma-list. -l auto-derives from -s when omitted
   [x] update
       extended all three wordlists
