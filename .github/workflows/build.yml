@@ -1,0 +1,45 @@
+name: build
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: linux (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install deps
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: build
+        run: make lulzbuster
+      - name: smoke test
+        run: ./lulzbuster -V
+
+  macos:
+    name: macos (apple silicon)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        run: make lulzbuster
+      - name: smoke test
+        run: ./lulzbuster -V
+
+  freebsd:
+    name: freebsd (vm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build + smoke test in freebsd vm
+        uses: vmactions/freebsd-vm@v1
+        with:
+          usesh: true
+          prepare: pkg install -y gmake curl
+          run: |
+            gmake lulzbuster
+            ./lulzbuster -V
