@@ -8,6 +8,7 @@ id_dsa
 id_rsa
 *.key
 *.log
+*.d
 *.o
 passwd
 *.pyc

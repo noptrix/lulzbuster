@@ -47,12 +47,16 @@ endef
 
 export BANNER
 
-CC = gcc
+CC ?= cc
 RM = rm -rf
 MV = mv
 CP = cp -r
 MKDIR = mkdir -p
 STRIP = strip
+
+# OS detection for ld + strip flag dialects. linux = GNU binutils,
+# darwin = apple's ld + BSD strip, *BSD = lld + elftoolchain (GNU-ish)
+UNAME_S := $(shell uname -s)
 
 DESTDIR = /usr/local
 INSTDIR = $(DESTDIR)/bin
@@ -78,7 +82,23 @@ CFLAGS += -ffunction-sections -fdata-sections
 #CFLAGS += -fsanitize=address -I $(INCDIR)
 #CFLAGS += -MMD -MP
 
-LDFLAGS = -lcurl -Wl,--gc-sections -flto
+# linker dead-code stripping: GNU/BSD use --gc-sections, macOS uses
+# -dead_strip (apple's ld doesn't grok --gc-sections)
+ifeq ($(UNAME_S),Darwin)
+  LDFLAGS = -lcurl -Wl,-dead_strip -flto
+else
+  LDFLAGS = -lcurl -Wl,--gc-sections -flto
+endif
+
+# strip flag dialect: GNU binutils on linux supports the long options +
+# section -R; macOS/*BSD strip is leaner so we just strip debug syms
+ifeq ($(UNAME_S),Linux)
+  STRIP_FLAGS = -s -g -S -d --strip-debug --strip-dwo --strip-unneeded \
+                -R .comment -R .gnu.version -R .gnu_debuglink \
+                -R .note.ABI-tag -R .note.gnu.build-id -R .note.gnu.property
+else
+  STRIP_FLAGS = -S
+endif
 
 OBJS = $(SRCDIR)/lulzbuster.o $(SRCDIR)/help.o $(SRCDIR)/checks.o
 OBJS += $(SRCDIR)/wrapper.o $(SRCDIR)/error.o $(SRCDIR)/opts.o $(SRCDIR)/http.o
@@ -108,14 +128,7 @@ default:
 
 lulzbuster: $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
-	$(STRIP) -s -g -S -d --strip-debug --strip-dwo --strip-unneeded \
-		-R .comment \
-		-R .gnu.version \
-		-R .gnu_debuglink \
-		-R .note.ABI-tag \
-		-R .note.gnu.build-id \
-		-R .note.gnu.property \
-		lulzbuster
+	$(STRIP) $(STRIP_FLAGS) lulzbuster
 
 install:
 	$(MKDIR) $(INSTDIR)

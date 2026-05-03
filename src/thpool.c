@@ -10,12 +10,16 @@
 
 /* feature-test macros must be set before any system header is pulled in.
  * _POSIX_C_SOURCE alone hides usleep() in glibc, so add _DEFAULT_SOURCE
- * to keep BSD/GNU extensions available */
+ * to keep BSD/GNU extensions available. _DARWIN_C_SOURCE on macOS exposes
+ * pthread_setname_np() which apple hides under strict POSIX mode */
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #endif
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
 #endif
 
 #include <unistd.h>
@@ -27,6 +31,10 @@
 #include <time.h>
 #if defined(__linux__)
 #include <sys/prctl.h>
+#endif
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || \
+    defined(__DragonFly__)
+#include <pthread_np.h>
 #endif
 
 #include "thpool.h"
@@ -334,8 +342,12 @@ static void* thread_do(struct thread* thread_p){
 	prctl(PR_SET_NAME, thread_name);
 #elif defined(__APPLE__) && defined(__MACH__)
 	pthread_setname_np(thread_name);
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || \
+      defined(__DragonFly__)
+	pthread_set_name_np(pthread_self(), thread_name);
 #else
-	err("thread_do(): pthread_setname_np is not supported on this system");
+	/* thread naming unsupported here - non-fatal, just kills profiler labels */
+	(void) thread_name;
 #endif
 
 	/* Assure all threads have been created before starting serving */
