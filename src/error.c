@@ -97,13 +97,22 @@ error_T error[] = {
   { W_CLOG,             WARN_CLOG,            _warn },
   { W_CURL_CLNUP,       WARN_CURL_CLNUP,      _warn },
   { W_CURL_DNS,         WARN_CURL_DNS,        _warn },
+  { E_SIZE,             ERR_SIZE,             _errorf },
+  { E_FMT,              ERR_FMT,              _errorf },
+  { E_CURL_SSLCERT,     ERR_CURL_SSLCERT,     _error },
+  { E_CURL_SSLKEY,      ERR_CURL_SSLKEY,      _error },
+  { E_CURL_KEYPASS,     ERR_CURL_KEYPASS,     _error },
+  { E_RCERT,            ERR_RCERT,            _errorf },
+  { E_RKEY,             ERR_RKEY,             _errorf },
+  { E_REGEX,            ERR_REGEX,            _errorf },
 };
 
 
-/* generate (fatal) error message and exit prog */
+/* generate (fatal) error message and exit prog. color + [-] prefix
+ * applied here so we honor the runtime color flag */
 static void _errorf(const char *msg)
 {
-  SLOG("%s", msg);
+  ESLOG("%s", msg);
   __EXIT_FAILURE;
 
   return;
@@ -113,14 +122,14 @@ static void _errorf(const char *msg)
 /* generate error message */
 static void _error(const char *msg)
 {
-  SLOG("%s", msg);
+  ESLOG("%s", msg);
 }
 
 
 /* generate warn messages */
 static void _warn(const char *msg)
 {
-  SLOG("%s", msg);
+  WSLOG("%s", msg);
 
   return;
 }

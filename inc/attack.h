@@ -39,25 +39,22 @@
  ******************************************************************************/
 
 
-/* headline before formatstring */
-#define HEADLINE "code   size   real size   resp time   url\n\n"
-
-/* formatstring for hit line */
-#define HITFMT "%ld | %4.0lf%c | %8luB | %lfs | %s\n"
-
-/* hit line */
-#define __HIT(log) \
-  CLOG(stderr, BGREEN"\r[*] "CRESET HITFMT, code, bytes, suf, real_size, rtime,\
-       job->url); \
-  if (log != stderr) {\
-    CLOG(log, "[*] "HITFMT, code, bytes, suf, real_size, rtime, job->url); \
-  }
+/* headline before formatstring. column widths + pipe positions are
+ * tuned to line up exactly with the row formatter in emit_hit() /
+ * log_hit() (see src/log.c). if you change CTYPE_COL_WIDTH or any
+ * field width there, you MUST eyeball this header too. layout:
+ *   code (4) | size  (5) | real size (9) | lines  (6) | words  (6) |
+ *   content-type (20) | resp time (9) | url
+ * pipes land at offsets matching the `[*] %-4ld | ... ` data rows */
+#define HEADLINE \
+  "code | size  | real size | lines  | words  | content-type         "  \
+  "| resp time | url\n\n"
 
 /* status line */
-#define PERCENT (double) (curjob * 100) / (double) job->opts->num_attack_urls
+#define PERCENT (double) (my_jobno * 100) / (double) job->opts->num_attack_urls
 #define __STATUS \
-  CLOG(stderr, "\r"BBLUE"[+]"CRESET" scanning %lu / %lu (%.2f%%)", curjob, \
-       job->opts->num_attack_urls, PERCENT)
+  CLOG(stderr, "\r%s%s[+]%s scanning %lu / %lu (%.2f%%)", CBOLD, CBLUE, \
+       CRESET, my_jobno, job->opts->num_attack_urls, PERCENT)
 
 
 /*******************************************************************************
@@ -65,11 +62,12 @@
  ******************************************************************************/
 
 
-/* our attack job */
+/* our attack job. logs[] is one open FILE* per selected format
+ * (NULL when that format isn't enabled). __HIT iterates over the
+ * non-NULL slots and emits a row in the matching format */
 typedef struct {
-  FILE *logfile;
+  FILE *logs[LOG_FMT_COUNT];
   const char *url;
-  CURL *eh;
   opts_T *opts;
 } job_T;
 

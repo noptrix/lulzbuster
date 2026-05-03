@@ -20,6 +20,7 @@
 /* sys includes */
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
 
 
 /* own includes */
@@ -30,83 +31,178 @@
 #include "lulzbuster.h"
 
 
-/* built-in user-agents list */
+/* built-in user-agents list - mix of legacy + modern (2024-2026) UAs
+ * across desktop / mobile / bot. order doesn't matter, get_rand_useragent
+ * picks uniformly at random */
 static useragents_T useragents[] = {
-/*  {"android", "firefox", "Mozilla/5.0 (Android 9; Mobile; rv:72.0) Gecko/71.0 Firefox/72.0"},
-  {"android", "firefox", "Mozilla/5.0 (Android 9; Mobile; rv:71.0) Gecko/71.0 Firefox/71.0"},
-  {"android", "firefox", "Mozilla/5.0 (Android 8.0.0; Mobile; rv:68.4.1) Gecko/68.4.1 Firefox/68.4.1"},
-  {"android", "chrome", "Mozilla/5.0 (Linux; Android 8.0.0; SM-G930F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.101 Mobile Safari/537.36"},
-  {"android", "chrome", "Mozilla/5.0 (Linux; Android 10; ONEPLUS A6013) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.116 Mobile Safari/537.36"},
-  {"android", "chrome", "Mozilla/5.0 (Linux; Android 8.0.0; moto e5 plus) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.116 Mobile Safari/537.36"},
-  {"android", "chrome", "Mozilla/5.0 (Linux; Android 8.0.0; SAMSUNG SM-G930F) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/10.2 Chrome/71.0.3578.99 Mobile Safari/537.36"},
-  {"android", "chrome", "Mozilla/5.0 (Linux; Android 9; Nokia 3.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.136 Mobile Safari/537.36"},
-  {"android", "opera", "Mozilla/5.0 (Linux; Android 10; MAR-LX1A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.116 Mobile Safari/537.36 OPR/55.2.2719.50740"},
-  {"android", "opera", "Mozilla/5.0 (Linux; Android 7.0; SM-A310F Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.91 Mobile Safari/537.36 OPR/42.7.2246.114996"},
-  {"android", "samsung", "Mozilla/5.0 (Linux; Android 9; SAMSUNG SM-J730F) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/10.2 Chrome/71.0.3578.99 Mobile Safari/537.36"},
-  {"android", "samsung", "Mozilla/5.0 (Linux; Android 9; SAMSUNG SM-S102DL) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/10.2 Chrome/71.0.3578.99 Mobile Safari/537.36"},
-  {"bot", "ahrefsbot", "Mozilla/5.0 (compatible; AhrefsBot/6.1; +http://ahrefs.com/robot/)"},
-  {"bot", "bingbot", "Mozilla/5.0 (compatible; bingbot/2.0 +http://www.bing.com/bingbot.htm)"},
-  {"bot", "baiduspider", "Baiduspider+(+http://www.baidu.com/search/spider.htm)"},
-  {"bot", "googlebot", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"},
-  {"bot", "msie", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"},
-  {"bot", "yahoo", "Mozilla/5.0 (compatible; Yahoo! Slurp; http://help.yahoo.com/help/us/ysearch/slurp)"},
-  {"bot", "yandex", "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)"},
-  {"ios", "safari", "Mozilla/5.0 (iPad; CPU OS 11_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.0 Tablet/15E148 Safari/604.1"},
-  {"ios", "safari", "Mozilla/5.0 (iPad; CPU OS 13_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/79.0.3945.73 Mobile/15E148 Safari/604.1"},
-  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/89.2.287201133 Mobile/15E148 Safari/604.1"},
-  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 12_1_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.0 Mobile/15E148 Safari/604.1"},
-  {"ios", "firefox", "Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_2 like Mac OS X) AppleWebKit/603.2.4 (KHTML, like Gecko) FxiOS/7.5b3349 Mobile/14F89 Safari/603.2.4"},
-  {"ios", "chrome", "Mozilla/5.0 (iPhone; CPU iPhone OS 9_3_2 like Mac OS X) AppleWebKit/601.1 (KHTML, like Gecko) CriOS/51.0.2704.104 Mobile/13F69 Safari/601.1.46"},*/
-  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS aarch64 12607.58.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.86 Safari/537.36"},
-  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS x86_64 12239.19.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.38 Safari/537.36"},
-  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS armv7l 12371.89.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36"},
-  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS x86_64 12607.82.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.123 Safari/537.36"},
-  {"freebsd", "chrome", "Mozilla/5.0 (X11; FreeBSD amd64; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Iridium/2019.04 Safari/537.36 Chrome/73.0.0.0"},
-  {"freebsd", "firefox", "Mozilla/5.0 (X11; FreeBSD amd64; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"linux", "firefox", "Mozilla/5.0 (X11; Linux i686; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"linux", "firefox", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"linux", "firefox", "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
-  {"linux", "crhome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4029.4 Safari/537.36"},
-  {"linux", "opera", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36 OPR/62.0.3331.14 (Edition beta),gzip(gfe)"},
-  {"linux", "vivaldi", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.134 Safari/537.36 Vivaldi/2.5.1525.40"},
-  {"linux", "links", "Links (2.7; Linux 3.5.0-17-generic x86_64; GNU C 4.7.1; text)"},
-  {"linux", "lynx", "Lynx/2.8.6rel.4 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/1.6.3"},
-  {"linux", "midori", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0 Safari/605.1.15 Midori/6"},
-  {"linux", "thunderbird", "Mozilla/5.0 (X11; Linux x86_64; rv:68.0) Gecko/20100101 Thunderbird/68.4.1"},
-  {"linux", "thunderbird", "Mozilla/5.0 (X11; Linux x86_64; rv:68.0) Gecko/20100101 Thunderbird/68.4.1 Lightning/68.4.1"},
-  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0 Safari/605.1.15"},
-  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.4 Safari/605.1.15"},
-  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.4 Safari/605.1.15"},
-  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/21.0 Safari/605.1.15"},
-  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:71.0) Gecko/20100101 Firefox/71.0"},
-  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
-  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
-  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.36 Safari/537.36"},
-  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
-  {"macos", "opera", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.117 Safari/537.36 OPR/66.0.3515.36"},
-  {"macos", "opera", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36 OPR/60.0.3255.170"},
-  {"openbsd", "chrome", "Mozilla/5.0 (X11; OpenBSD amd64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36"},
-  {"openbsd", "chrome", "Mozilla/5.0 (X11; OpenBSD amd64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/43.0.2357.124 Safari/537.36"},
-  {"openbsd", "firefox", "Mozilla/5.0 (X11; OpenBSD amd64; rv:71.0) Gecko/20100101 Firefox/71.0"},
-  {"openbsd", "firefox", "Mozilla/5.0 (X11; OpenBSD amd64; rv:62.0) Gecko/20100101 Firefox/62.0"},
-  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.18363"},
-  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; Cortana 1.14.0.19041; 10.0.0.0.19041.21) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19041"},
-  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; Cortana 1.13.0.18362; 10.0.0.0.18363.592) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.18363"},
-  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.18362"},
-  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"windows", "firefox", "Mozilla/5.0 (Windows NT 6.3; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0"},
-  {"windows", "firefox", "Mozilla/5.0 (Windows NT 6.4; WOW64; rv:71.0) Gecko/20100101 Firefox/71.0"},
+  /* === windows desktop === */
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"},
   {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4034.0 Safari/537.36"},
   {"windows", "chrome", "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
-  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3835.0 Safari/537.36"},
-  {"windows", "opera", "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.27 Safari/537.36 OPR/62.0.3331.10 (Edition beta)"},
-  {"windows", "opera", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.120 Safari/537.36 OPR/64.0.3417.170"},
-  {"windows", "opera", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36 OPR/65.0.3467.78"},
-  {"windows", "vivaldi", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.94 Safari/537.36 Vivaldi/2.6.1566.40"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.18363"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:72.0) Gecko/20100101 Firefox/72.0"},
+  {"windows", "opera", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 OPR/124.0.0.0"},
+  {"windows", "opera", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 OPR/115.0.0.0"},
+  {"windows", "opera", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 OPR/106.0.0.0"},
+  {"windows", "vivaldi", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Vivaldi/7.0.3495.27"},
+  {"windows", "vivaldi", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Vivaldi/6.9.3447.54"},
+  {"windows", "brave", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Brave/138"},
+  {"windows", "brave", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+
+  /* === macos desktop === */
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.4 Safari/605.1.15"},
+  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"},
+  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"},
+  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
+  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:141.0) Gecko/20100101 Firefox/141.0"},
+  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:135.0) Gecko/20100101 Firefox/135.0"},
+  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 13.6; rv:128.0) Gecko/20100101 Firefox/128.0"},
+  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0"},
+  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:72.0) Gecko/20100101 Firefox/72.0"},
+  {"macos", "edge", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0"},
+  {"macos", "edge", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"},
+  {"macos", "opera", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 OPR/124.0.0.0"},
+  {"macos", "arc", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+  {"macos", "brave", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"},
+
+  /* === linux desktop === */
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"},
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"},
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"},
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:141.0) Gecko/20100101 Firefox/141.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:141.0) Gecko/20100101 Firefox/141.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux i686; rv:128.0) Gecko/20100101 Firefox/128.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:72.0) Gecko/20100101 Firefox/72.0"},
+  {"linux", "edge", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0"},
+  {"linux", "edge", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0"},
+  {"linux", "opera", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 OPR/124.0.0.0"},
+  {"linux", "vivaldi", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Vivaldi/7.0.3495.27"},
+  {"linux", "brave", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"},
+  {"linux", "links", "Links (2.30; Linux 6.8.0-generic x86_64; GNU C 13.2; text)"},
+  {"linux", "lynx", "Lynx/2.9.2 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/3.8"},
+  {"linux", "midori", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0 Safari/605.1.15 Midori/9"},
+  {"linux", "thunderbird", "Mozilla/5.0 (X11; Linux x86_64; rv:115.0) Gecko/20100101 Thunderbird/115.0"},
+  {"linux", "thunderbird", "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Thunderbird/128.0"},
+
+  /* === android mobile === */
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 13; SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 12; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 10; ONEPLUS A6013) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.116 Mobile Safari/537.36"},
+  {"android", "firefox", "Mozilla/5.0 (Android 15; Mobile; rv:141.0) Gecko/141.0 Firefox/141.0"},
+  {"android", "firefox", "Mozilla/5.0 (Android 14; Mobile; rv:135.0) Gecko/135.0 Firefox/135.0"},
+  {"android", "firefox", "Mozilla/5.0 (Android 13; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0"},
+  {"android", "firefox", "Mozilla/5.0 (Android 12; Mobile; rv:120.0) Gecko/120.0 Firefox/120.0"},
+  {"android", "samsung", "Mozilla/5.0 (Linux; Android 15; SAMSUNG SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/138.0.0.0 Mobile Safari/537.36"},
+  {"android", "samsung", "Mozilla/5.0 (Linux; Android 14; SAMSUNG SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/130.0.0.0 Mobile Safari/537.36"},
+  {"android", "samsung", "Mozilla/5.0 (Linux; Android 13; SAMSUNG SM-A536B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/22.0 Chrome/120.0.0.0 Mobile Safari/537.36"},
+  {"android", "edge", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36 EdgA/138.0.0.0"},
+  {"android", "opera", "Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 OPR/85.0.0.0"},
+  {"android", "brave", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36"},
+  {"android", "duckduckgo", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile DuckDuckGo/5 Safari/537.36"},
+
+  /* === ios mobile === */
+  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/22F76 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/22C152 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/22A348 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/21F90 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/21A329 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/22F76 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/21F90 Safari/604.1"},
+  {"ios", "chrome", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/142.0.0.0 Mobile/22F76 Safari/604.1"},
+  {"ios", "chrome", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/21F90 Safari/604.1"},
+  {"ios", "firefox", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/141.0 Mobile/22F76 Safari/605.1.15"},
+  {"ios", "firefox", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/125.0 Mobile/21A329 Safari/605.1.15"},
+  {"ios", "edge", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 EdgiOS/138.0.0.0 Mobile/22C152 Safari/605.1.15"},
+  {"ios", "duckduckgo", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) DuckDuckGo/8 Mobile/22F76 Safari/605.1.15"},
+
+  /* === chromiumos === */
+  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS x86_64 15748.81.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"},
+  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS aarch64 15633.69.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+
+  /* === bsd-flavored === */
+  {"freebsd", "firefox", "Mozilla/5.0 (X11; FreeBSD amd64; rv:135.0) Gecko/20100101 Firefox/135.0"},
+  {"freebsd", "firefox", "Mozilla/5.0 (X11; FreeBSD amd64; rv:128.0) Gecko/20100101 Firefox/128.0"},
+  {"freebsd", "chrome", "Mozilla/5.0 (X11; FreeBSD amd64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"},
+  {"openbsd", "firefox", "Mozilla/5.0 (X11; OpenBSD amd64; rv:128.0) Gecko/20100101 Firefox/128.0"},
+  {"openbsd", "firefox", "Mozilla/5.0 (X11; OpenBSD amd64; rv:115.0) Gecko/20100101 Firefox/115.0"},
+  {"openbsd", "chrome", "Mozilla/5.0 (X11; OpenBSD amd64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+  {"netbsd", "firefox", "Mozilla/5.0 (X11; NetBSD amd64; rv:128.0) Gecko/20100101 Firefox/128.0"},
+
+  /* === bots / crawlers === */
+  {"bot", "googlebot", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"},
+  {"bot", "googlebot-mobile", "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"},
+  {"bot", "googlebot-image", "Googlebot-Image/1.0"},
+  {"bot", "bingbot", "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)"},
+  {"bot", "duckduckbot", "Mozilla/5.0 (compatible; DuckDuckBot-Https/1.1; https://duckduckgo.com/duckduckbot)"},
+  {"bot", "yandexbot", "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)"},
+  {"bot", "baiduspider", "Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)"},
+  {"bot", "ahrefsbot", "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)"},
+  {"bot", "semrushbot", "Mozilla/5.0 (compatible; SemrushBot/7~bl; +http://www.semrush.com/bot.html)"},
+  {"bot", "mj12bot", "Mozilla/5.0 (compatible; MJ12bot/v1.4.8; http://mj12bot.com/)"},
+  {"bot", "facebookbot", "Mozilla/5.0 (compatible; facebookexternalhit/1.1; +http://www.facebook.com/externalhit_uatext.php)"},
+  {"bot", "twitterbot", "Twitterbot/1.0"},
+  {"bot", "linkedinbot", "LinkedInBot/1.0 (compatible; Mozilla/5.0; Apache-HttpClient +http://www.linkedin.com)"},
+  {"bot", "telegrambot", "TelegramBot (like TwitterBot)"},
+  {"bot", "discordbot", "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"},
+  {"bot", "slackbot", "Slackbot 1.0 (+https://api.slack.com/robots)"},
+  {"bot", "applebot", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)"},
+  {"bot", "petalbot", "Mozilla/5.0 (compatible; PetalBot; +https://webmaster.petalsearch.com/site/petalbot)"},
+  {"bot", "msie", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)"},
+
+  /* === ai/llm crawlers (newer kids on the block) === */
+  {"bot", "gptbot", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot"},
+  {"bot", "chatgpt-user", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot"},
+  {"bot", "claudebot", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ClaudeBot/1.0; +claudebot@anthropic.com"},
+  {"bot", "perplexitybot", "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot"},
+  {"bot", "ccbot", "Mozilla/5.0 (compatible; CCBot/2.0; +https://commoncrawl.org/faq/)"},
+  {"bot", "google-extended", "Mozilla/5.0 (compatible; Google-Extended/1.0; +https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers)"},
+  {"bot", "bytespider", "Mozilla/5.0 (Linux; U; Android 5.0; en-US; MZ-M3 Note Build/LRX21V) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 UCBrowser/11.0.5.850 U3/0.8.0 Mobile Safari/534.30; Bytespider; spider-feedback@bytedance.com"},
+
+  /* === legacy entries kept for variety === */
+  {"chromiumos", "chrome", "Mozilla/5.0 (X11; CrOS aarch64 12607.58.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.86 Safari/537.36"},
+  {"linux", "opera", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36 OPR/62.0.3331.14"},
+  {"linux", "vivaldi", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.134 Safari/537.36 Vivaldi/2.5.1525.40"},
+  {"freebsd", "chrome", "Mozilla/5.0 (X11; FreeBSD amd64; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Iridium/2019.04 Safari/537.36 Chrome/73.0.0.0"},
 };
 
 
@@ -114,50 +210,133 @@ static useragents_T useragents[] = {
 static pthread_mutex_t locks[NUM_LOCKS];
 
 
-/* generate a random url based on given url: base + /foo + randintstr + .txt */
-static char *rand_url(const char *url)
+/* generate a random url for the given pattern index. each pattern
+ * resembles a different URL "shape" the user might scan, so we can
+ * catch sites that respond differently per pattern. picks the right
+ * format string based on whether `url` already has a trailing slash,
+ * so recursion targets like ".../admin/" don't end up with "//" */
+static char *rand_url(const char *url, size_t pattern_idx)
 {
   char *randurl = NULL;
-  register int randno = 0;
-  register size_t randurl_size = 0;
+  const char *fmt = NULL;
+  int r1 = rand();
+  int r2 = rand();
+  size_t ulen = strlen(url);
+  bool ts = (ulen > 0 && url[ulen - 1] == '/');
+  size_t need = 0;
 
-  srand(time(NULL));
-  randno = rand();
-  randurl_size = snprintf(NULL, 0, "%s/%d.txt", url, randno) + 1;
-  randurl = xcalloc(1, randurl_size + 1);
-  snprintf(randurl, randurl_size, "%s/%d.txt", url, randno);
+  switch (pattern_idx) {
+    case 0: /* random file with extension */
+      fmt = ts ? "%s%d.txt" : "%s/%d.txt";
+      need = snprintf(NULL, 0, fmt, url, r1) + 1;
+      randurl = xcalloc(1, need);
+      snprintf(randurl, need, fmt, url, r1);
+      break;
+    case 1: /* random "directory" */
+      fmt = ts ? "%s%d/" : "%s/%d/";
+      need = snprintf(NULL, 0, fmt, url, r1) + 1;
+      randurl = xcalloc(1, need);
+      snprintf(randurl, need, fmt, url, r1);
+      break;
+    case 2: /* random no extension */
+      fmt = ts ? "%s%d" : "%s/%d";
+      need = snprintf(NULL, 0, fmt, url, r1) + 1;
+      randurl = xcalloc(1, need);
+      snprintf(randurl, need, fmt, url, r1);
+      break;
+    case 3: /* deeper random path */
+      fmt = ts ? "%s%d/%d/" : "%s/%d/%d/";
+      need = snprintf(NULL, 0, fmt, url, r1, r2) + 1;
+      randurl = xcalloc(1, need);
+      snprintf(randurl, need, fmt, url, r1, r2);
+      break;
+    case 4: /* random extension */
+    default:
+      fmt = ts ? "%s%d.%d" : "%s/%d.%d";
+      need = snprintf(NULL, 0, fmt, url, r1, r2) + 1;
+      randurl = xcalloc(1, need);
+      snprintf(randurl, need, fmt, url, r1, r2);
+      break;
+  }
 
   return randurl;
 }
 
 
-/* connection check and wildcard detection. if wildcard response detected save
- * the body size so we can use that later in attack() */
-wildcard_T check_conn_wildcard(const char *url)
+/* connection check and wildcard detection. fires MAX_WCARD_PROBES probes
+ * at different URL shapes and records the unique (code, size) tuples so
+ * attack() can suppress hits matching any of them in smart mode. honors
+ * proxy + proxy_creds so we don't bypass the user's proxy on networks
+ * where direct egress is blocked */
+wildcard_T check_conn_wildcard(const char *url, const char *proxy,
+                               const char *proxy_creds, bool in_ssl,
+                               const char *cert, const char *key,
+                               const char *key_pass, long conn_timeout)
 {
-  static wildcard_T wcard;
-  char *randurl = rand_url(url);
-  CURL *curl = curl_easy_init();
-  CURLcode res = 0;
+  wildcard_T wcard = {0};
+  size_t i = 0, j = 0;
+  bool already = false;
+  /* mirror set_http_options(): default verifies, -i flips both off */
+  long verify_peer = in_ssl ? 0L : 1L;
+  long verify_host = in_ssl ? 0L : 2L;
 
-  if (curl) {
-    curl_easy_setopt(curl, CURLOPT_URL, randurl);
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, TCP_CONN_TIMEOUT);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &write_cb);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-    res = curl_easy_perform(curl);
-    free(randurl);
-    if (res != CURLE_OK) {
-      wcard.conn_ok = FALSE;
-    } else {
-      curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &wcard.resp_code);
-      curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD_T, &wcard.resp_size);
-      wcard.conn_ok = TRUE;
+  for (i = 0; i < MAX_WCARD_PROBES; ++i) {
+    char *randurl = rand_url(url, i);
+    CURL *curl = curl_easy_init();
+    CURLcode res = 0;
+    long code = 0;
+    curl_off_t size = 0;
+
+    if (curl == NULL) {
+      free(randurl);
+      continue;
     }
-  }
 
-  curl_easy_cleanup(curl);
+    curl_easy_setopt(curl, CURLOPT_URL, randurl);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, conn_timeout);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &write_cb);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, verify_peer);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, verify_host);
+    if (cert)     curl_easy_setopt(curl, CURLOPT_SSLCERT, cert);
+    if (key)      curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
+    if (key_pass) curl_easy_setopt(curl, CURLOPT_KEYPASSWD, key_pass);
+    if (proxy != NULL) {
+      curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
+      if (proxy_creds != NULL) {
+        curl_easy_setopt(curl, CURLOPT_PROXYAUTH, CURLAUTH_ANY);
+        curl_easy_setopt(curl, CURLOPT_PROXYUSERPWD, proxy_creds);
+      }
+    }
+    res = curl_easy_perform(curl);
+
+    if (res == CURLE_OK) {
+      curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
+      curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD_T, &size);
+
+      wcard.conn_ok = true;
+      if (code == HTTP_OK) {
+        wcard.any_http_ok = true;
+      }
+
+      /* dedup: only store unique (code, size) tuples */
+      already = false;
+      for (j = 0; j < wcard.num_fps; ++j) {
+        if (wcard.fps[j].resp_code == code &&
+            wcard.fps[j].resp_size == size) {
+          already = true;
+          break;
+        }
+      }
+      if (!already && wcard.num_fps < MAX_WCARD_PROBES) {
+        wcard.fps[wcard.num_fps].resp_code = code;
+        wcard.fps[wcard.num_fps].resp_size = size;
+        wcard.num_fps++;
+      }
+    }
+
+    free(randurl);
+    curl_easy_cleanup(curl);
+  }
 
   return wcard;
 }
@@ -191,14 +370,21 @@ url_T parse_url(const char *url)
 }
 
 
-/* randomly fetch an useragent from useragents tables */
+/* randomly fetch an useragent from useragents tables. workers call
+ * this concurrently so we can't use plain rand() (shares global state,
+ * not thread-safe per POSIX). thread-local seed + rand_r() instead.
+ * seed is lazy-init'd on first call per thread from time + a tid hash */
 const char *get_rand_useragent()
 {
-  register int size = ARRAY_SIZE(useragents);
+  static __thread unsigned int seed = 0;
+  register size_t size = ARRAY_SIZE(useragents);
 
-  srand(time(NULL));
-
-  return useragents[rand() / size % size].ua;
+  if (seed == 0) {
+    seed = (unsigned int) time(NULL) ^
+           (unsigned int)(uintptr_t) pthread_self();
+    if (seed == 0) seed = 1;  /* rand_r dislikes 0 in some impls */
+  }
+  return useragents[rand_r(&seed) % size].ua;
 }
 
 
@@ -230,40 +416,43 @@ void print_useragents()
 
 
 /* do some necessary curl related cleanups */
-unsigned char cleanup_http(curl_T *curl)
+bool cleanup_http(curl_T *curl)
 {
   curl_slist_free_all(curl->list);
   curl_share_cleanup(curl->sh);
   curl_easy_cleanup(curl->eh);
   curl_global_cleanup();
 
-  return TRUE;
+  return true;
 }
 
 
 /* do some necessary curl related inits */
-unsigned char init_http(curl_T *curl)
+bool init_http(curl_T *curl)
 {
-  register unsigned char check_ok = TRUE;
+  register bool check_ok = true;
+
+  /* seed the PRNG once - used by rand_url() and get_rand_useragent() */
+  srand((unsigned int) time(NULL));
 
   /* curl global init */
   if (curl_global_init(CURL_GLOBAL_ALL) != 0) {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   /* initial handler init. will be duplicated for worker threads! */
   curl->eh = curl_easy_init();
   if (curl->eh == NULL) {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   /* init shared object for easy handler */
   curl->sh = curl_share_init();
   if (curl->sh == NULL) {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
-  if (check_ok == FALSE) {
+  if (!check_ok) {
     err(E_CURL_INIT);
     return check_ok;
   }
@@ -302,52 +491,91 @@ void lock_cb(CURL *handle, curl_lock_data data, curl_lock_access access,
 
 
 /* destroy initiated locks */
-unsigned char kill_locks(void)
+bool kill_locks(void)
 {
   register size_t i = 0;
 
   for (i = 0; i < NUM_LOCKS; ++i) {
     if (pthread_mutex_destroy(&locks[i]) != 0) {
       err(W_PTHR_MX_DSTR);
-      return FALSE;
+      return false;
     }
   }
 
-  return TRUE;
+  return true;
 }
 
 
 /* init pthread mutex locks */
-unsigned char init_locks(void)
+bool init_locks(void)
 {
   register size_t i = 0;
 
   for (i = 0; i < NUM_LOCKS; ++i) {
     if (pthread_mutex_init(&locks[i], NULL) != 0) {
       err(E_PTHR_MX_INIT);
-      return FALSE;
+      return false;
     }
   }
 
-  return TRUE;
+  return true;
 }
 
 
-/* write callback func for curl */
+/* write callback func for curl. if userptr points to a body_stats_T we
+ * count bytes/newlines/words on the fly. word counting tracks
+ * in_word state across chunks so we don't double-count */
 size_t write_cb(void *buff, register size_t size, register size_t nmemb,
                 void *userptr)
 {
-  (void) buff;
-  (void) userptr;
+  register size_t total = size * nmemb;
+  body_stats_T *st = (body_stats_T *) userptr;
 
-  return size * nmemb; /* curl wants this otherwise we get '23' error code */
+  if (st) {
+    register const unsigned char *b = (const unsigned char *) buff;
+    register size_t i = 0;
+    register bool in_word = st->in_word;
+    register unsigned char c = 0;
+    register bool is_ws = false;
+
+    for (i = 0; i < total; ++i) {
+      c = b[i];
+      is_ws = (c == ' ' || c == '\t' || c == '\n' || c == '\r');
+      if (c == '\n') {
+        st->lines++;
+      }
+      if (!is_ws && !in_word) {
+        st->words++;
+        in_word = true;
+      } else if (is_ws && in_word) {
+        in_word = false;
+      }
+    }
+
+    st->bytes += total;
+    st->in_word = in_word;
+
+    /* opt-in body capture for -b/-B regex matching. only active when
+     * the worker pre-allocated st->buf, otherwise we skip the memcpy
+     * entirely. truncate at buf_cap since regex matching the head of
+     * the body catches the signal we care about (titles, error text,
+     * auth markers) and keeps memory bounded */
+    if (st->buf != NULL && st->buf_len < st->buf_cap) {
+      size_t room = st->buf_cap - st->buf_len;
+      size_t take = total < room ? total : room;
+      memcpy(st->buf + st->buf_len, buff, take);
+      st->buf_len += take;
+    }
+  }
+
+  return total; /* curl wants this otherwise we get '23' error code */
 }
 
 
 /* do http request for our attack worker thread */
-unsigned char do_req(const char *url, CURL *handler, CURLSH *share)
+bool do_req(const char *url, CURL *handler, CURLSH *share)
 {
-  register unsigned char check_ok = TRUE;
+  register bool check_ok = true;
   /*static unsigned char num_err = 0;
   CURLcode res = 0;*/
 

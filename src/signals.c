@@ -19,57 +19,70 @@
 
 /* sys includes */
 #include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 
 /* own includes */
 #include "signals.h"
 
 
-/* SIGINT handler */
+/* set by sig_int, polled by workers + main thread for graceful bail
+ * and session save. sig_atomic_t = the only safe write from a signal
+ * handler. defined here, declared extern in signals.h */
+volatile sig_atomic_t g_interrupted = 0;
+
+
+/* SIGINT handler. only async-signal-safe calls allowed here: write(2)
+ * and a sig_atomic_t store. avoid stdio. workers check g_interrupted
+ * to bail gracefully; main thread does the actual save+exit. on a 2nd
+ * ctrl+c we bail hard via _exit (in case we're stuck somewhere) */
 void sig_int(int signo)
 {
+  static const char msg[] =
+    "\n\033[1;33;10m[!] \033[0minterrupted, finishing in-flight reqs...\n";
+  static const char msg2[] =
+    "\n\033[1;33;10m[!] \033[0msecond ctrl+c, bailing hard\n";
+
   (void) signo;
-
-  /* reset */
-  xsignal(SIGINT, sig_int);
-
-  return;
+  if (g_interrupted == 0) {
+    g_interrupted = 1;
+    (void) !write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  } else {
+    (void) !write(STDERR_FILENO, msg2, sizeof(msg2) - 1);
+    _exit(EXIT_FAILURE);
+  }
 }
 
 
-/* SIGALRM handler */
+/* SIGALRM handler. armed by main() when -T was given; on fire we
+ * piggyback on the SIGINT machinery (set g_interrupted, workers bail,
+ * main saves the session). only async-signal-safe calls allowed */
 void sig_alrm(int signo)
 {
+  static const char msg[] =
+    "\n\033[1;33;10m[!] \033[0mglobal timeout reached, finishing in-flight "
+    "reqs...\n";
+
   (void) signo;
-
-  /* reset */
-  xsignal(SIGALRM, sig_int);
-
-  return;
+  if (g_interrupted == 0) {
+    g_interrupted = 1;
+    (void) !write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  }
 }
 
 
-/* SIGUSR2 handler */
+/* SIGUSR2 handler - scaffolding for future session save/restore */
 void sig_usr2(int signo)
 {
   (void) signo;
-
-  /* reset */
-  xsignal(SIGUSR2, sig_int);
-
-  return;
 }
 
 
-/* SIGUSR1 handler */
+/* SIGUSR1 handler - scaffolding for future session save/restore */
 void sig_usr1(int signo)
 {
   (void) signo;
-
-  /* reset */
-  xsignal(SIGUSR1, sig_int);
-
-  return;
 }
 
 

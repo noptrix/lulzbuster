@@ -33,15 +33,16 @@
 #include "misc.h"
 
 
-/* static func prototypes */
-static unsigned char check_url(const char *);
+/* static func prototypes. tri-state checks (true/false/ASK for '?') stay
+ * unsigned char; everything else returns plain bool */
+static bool check_url(const char *);
 static unsigned char check_http_method(char *);
-static unsigned char check_file(const char *, int);
-static unsigned char check_num(const unsigned short int,
-                               const unsigned short int);
-static unsigned char check_creds(const char *);
+static bool check_file(const char *, int);
+static bool check_num(const unsigned short int,
+                      const unsigned short int);
+static bool check_creds(const char *);
 static unsigned char check_proxy(char *);
-static unsigned char check_port(const char *);
+static bool check_port(const char *);
 static unsigned char check_http_version(const char *);
 
 
@@ -69,9 +70,9 @@ void check_argc(int argc)
 
 
 /* check URL format */
-static unsigned char check_url(const char *target_url)
+static bool check_url(const char *target_url)
 {
-  register unsigned char check_ok = TRUE;
+  register bool check_ok = true;
   char *scheme = NULL;
   CURLUcode rc = 0;
   CURLU *url = curl_url();
@@ -82,11 +83,11 @@ static unsigned char check_url(const char *target_url)
     rc = curl_url_get(url, CURLUPART_SCHEME, &scheme, 0);
     if (!rc) {
       if ((strcmp(scheme, "http") != 0) && (strcmp(scheme, "https") != 0)) {
-        check_ok = FALSE;
+        check_ok = false;
       }
     }
   } else {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   curl_free(scheme);
@@ -99,7 +100,7 @@ static unsigned char check_url(const char *target_url)
 /* check HTTP request type */
 static unsigned char check_http_method(char *http_method)
 {
-  register unsigned char check_ok = FALSE;
+  register unsigned char check_ok = false;
   register size_t j = 0, len = strlen(http_method) + 1;
   char *http_methods[] = {
     HTTP_HEAD, HTTP_GET, HTTP_POST, HTTP_PUT, HTTP_DELETE, HTTP_OPTIONS,
@@ -107,7 +108,7 @@ static unsigned char check_http_method(char *http_method)
 
   /* abort immediately bullshit long was given */
   if (len > MAX_METHOD_LEN) {
-    return FALSE;
+    return false;
   }
 
   for (j = 0; j < ARRAY_SIZE(http_methods); j++) {
@@ -122,7 +123,7 @@ static unsigned char check_http_method(char *http_method)
       break;
     }
     if (!strcmp(http_method, http_methods[j])) {
-      check_ok = TRUE;
+      check_ok = true;
       break;
     }
   }
@@ -131,31 +132,28 @@ static unsigned char check_http_method(char *http_method)
 }
 
 
-/* check if we can open and read given file */
-static unsigned char check_file(const char *file, int mode)
+/* check if we can open the given file with the requested access mode.
+ * for write checks on a non-existing file we touch it (empty) so we can
+ * verify perms - launch_attack() will append to it later. previously
+ * unlink()ed the file unconditionally which nuked any existing -l log */
+static bool check_file(const char *file, int mode)
 {
-  register unsigned char check_ok = FALSE;
+  register bool check_ok = false;
   FILE *fp = NULL;
 
-  /* we need to create file if it does not exist before checking for W_OK bit */
-  if (mode & (W_OK)) {
-    fp = fopen(file, "a+");
+  /* file does not exist yet but caller wants to write - try to create
+   * an empty one so we can confirm write permission */
+  if ((mode & W_OK) && access(file, F_OK) != 0) {
+    fp = fopen(file, "a");
     if (fp == NULL) {
-      check_ok = FALSE;
+      return false;
     }
+    fclose(fp);
   }
 
   /* check for given mode */
   if (access(file, mode) == 0) {
-    check_ok = TRUE;
-  }
-
-  /* delete file if created before because of W_OK bit */
-  if (fp) {
-    if (unlink(file) == -1) {
-      err(W_UNLINK);
-    }
-    fclose(fp);
+    check_ok = true;
   }
 
   return check_ok;
@@ -163,26 +161,26 @@ static unsigned char check_file(const char *file, int mode)
 
 
 /* check if num exceeds MAX_* / lowers MIN_* */
-static unsigned char check_num(const unsigned short int num,
-                               const unsigned short int val)
+static bool check_num(const unsigned short int num,
+                      const unsigned short int val)
 {
-  register unsigned char check_ok = FALSE;
+  register bool check_ok = false;
 
   switch (val) {
    case MAX_THRDS:
-     check_ok = (num > MAX_THRDS) ? FALSE : TRUE;
+     check_ok = (num > MAX_THRDS) ? false : true;
      break;
    case MAX_DELAY: /* covers also conn and read timeout */
-     check_ok = (num > MAX_DELAY) ? FALSE : TRUE;
+     check_ok = (num > MAX_DELAY) ? false : true;
      break;
    case MIN_GLOB_TIMEOUT:
-     check_ok = (num != 0 && num < MIN_GLOB_TIMEOUT) ? FALSE : TRUE;
+     check_ok = (num != 0 && num < MIN_GLOB_TIMEOUT) ? false : true;
      break;
    case MAX_CONN_CACHE:
-     check_ok = (num > MAX_CONN_CACHE) ? FALSE : TRUE;
+     check_ok = (num > MAX_CONN_CACHE) ? false : true;
      break;
    default:
-     check_ok = TRUE;
+     check_ok = true;
   }
 
   return check_ok;
@@ -190,12 +188,12 @@ static unsigned char check_num(const unsigned short int num,
 
 
 /* check if credentials format is correct */
-static unsigned char check_creds(const char *str)
+static bool check_creds(const char *str)
 {
-  register unsigned char check_ok = FALSE;
+  register bool check_ok = false;
 
   if (str[0] && str[1]) {
-    check_ok = TRUE;
+    check_ok = true;
   }
 
   return check_ok;
@@ -205,7 +203,7 @@ static unsigned char check_creds(const char *str)
 /* check if correct scheme and <num> parts were given for proxy */
 static unsigned char check_proxy(char *str)
 {
-  register unsigned char check_ok = TRUE;
+  register unsigned char check_ok = true;
   register size_t i = 0, len = strlen(str) + 1;
   char tmpstr[len];
   char **pstr = NULL,
@@ -232,24 +230,31 @@ static unsigned char check_proxy(char *str)
     return ASK;
   }
 
+  /* bail early if no scheme token at all - strtok returns NULL on
+   * input like "::" or ":foo" and the strcmp below would deref NULL */
+  if (pstr[0] == NULL) {
+    free(pstr);
+    return false;
+  }
+
   /* too short or too long */
   if (pstr[3] != NULL) {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   /* wrong scheme */
   if ((strcmp(pstr[0], "http") != 0) && (strcmp(pstr[0], "https") != 0) &&
       (strcmp(pstr[0], "socks4") != 0) && (strcmp(pstr[0], "socks4a") != 0) &&
       (strcmp(pstr[0], "socks5") != 0) && (strcmp(pstr[0], "socks5h") != 0)) {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   /* wrong port */
   if (pstr[2]) {
     if (!check_port(pstr[2]))
-      check_ok = FALSE;
+      check_ok = false;
   } else {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   free(pstr);
@@ -258,17 +263,17 @@ static unsigned char check_proxy(char *str)
 }
 
 
-/* check if port is really between 0 and 65535 */
-static unsigned char check_port(const char *port)
+/* check if port is a valid TCP port (1..65535). port 0 is rejected
+ * because connecting to it makes no sense for a proxy */
+static bool check_port(const char *port)
 {
-  register unsigned char check_ok = TRUE;
+  register bool check_ok = true;
   long int p = 0;
 
   p = ATOI(port);
 
-  /* note: 0 is inofficially ok but with lulzbuster does not make sense */
   if (p <= 0 || p > 65535) {
-    check_ok = FALSE;
+    check_ok = false;
   }
 
   return check_ok;
@@ -278,7 +283,7 @@ static unsigned char check_port(const char *port)
 /* check if a valid http version was specified */
 static unsigned char check_http_version(const char *ver)
 {
-  register unsigned char check_ok = TRUE;
+  register unsigned char check_ok = true;
   char *http_vers[] = { HTTP_VER_10, HTTP_VER_11, HTTP_VER_20, HTTP_VER_30 };
   register size_t i = 0;
 
@@ -295,7 +300,7 @@ static unsigned char check_http_version(const char *ver)
   for (i = 0; i < ARRAY_SIZE(http_vers); ++i) {
     if ((strcmp(ver, HTTP_VER_10) != 0) && (strcmp(ver, HTTP_VER_11) != 0) &&
         (strcmp(ver, HTTP_VER_20) != 0) && (strcmp(ver, HTTP_VER_30) != 0)) {
-      check_ok = FALSE;
+      check_ok = false;
     }
   }
 
@@ -306,7 +311,7 @@ static unsigned char check_http_version(const char *ver)
 /* perform basic checks on all cmdline opts */
 void check_opts(opts_T *opts)
 {
-  register unsigned char check_ok = FALSE;
+  register unsigned char check_ok = false;
 
   /* check if a correct/full HTTP url was given for target start url */
   if (!check_url(opts->start_url)) {
@@ -402,6 +407,17 @@ void check_opts(opts_T *opts)
       free_lulzbuster(opts);
       err(E_WFILE);
     }
+  }
+
+  /* mTLS files: cert + key must be readable. without these checks
+   * curl would fail mid-perform with a less obvious error code */
+  if (opts->cert_file && !check_file(opts->cert_file, R_OK)) {
+    free_lulzbuster(opts);
+    err(E_RCERT);
+  }
+  if (opts->key_file && !check_file(opts->key_file, R_OK)) {
+    free_lulzbuster(opts);
+    err(E_RKEY);
   }
 
   return;

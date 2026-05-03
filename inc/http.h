@@ -29,6 +29,7 @@
 /* sys includes */
 #include <curl/curl.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 
 /* own includes */
@@ -145,6 +146,30 @@ typedef struct {
   const char *ua;
 } useragents_T;
 
+/* upper bound on the per-request body buffer used for -b/-B regex
+ * matching. anything past this gets truncated - matters for hits that
+ * legitimately serve large bodies (binary downloads etc), but the
+ * signal we care about (page titles, error strings, "login" markers)
+ * lives in the first few KB. 1 MiB is the sweet spot for our 30-thread
+ * default before memory pressure starts to bite */
+#define BODY_CAPTURE_MAX  (1024 * 1024)
+
+/* per-request body stats. one of these is stack-allocated in the attack
+ * worker and passed via CURLOPT_WRITEDATA so write_cb can tally
+ * bytes/lines/words while curl streams the body. when -b/-B is active
+ * `buf` points to a heap-allocated capture region the worker owns; the
+ * write_cb appends into it up to BODY_CAPTURE_MAX. NULL when regex
+ * filters are off so we don't pay the memcpy/alloc cost */
+typedef struct {
+  size_t bytes;
+  size_t lines;
+  size_t words;
+  bool in_word;
+  char *buf;          /* body capture (NULL when no regex filter) */
+  size_t buf_len;     /* current bytes in buf */
+  size_t buf_cap;     /* capacity of buf (== BODY_CAPTURE_MAX when set) */
+} body_stats_T;
+
 /* parsed url table */
 typedef struct {
   char *scheme;
@@ -156,11 +181,23 @@ typedef struct {
   char *query;
 } url_T;
 
-/* for wildcard check */
+/* max num wildcard probes we fire at the target during startup. each
+ * probe uses a different random URL shape so we can fingerprint sites
+ * that respond differently per pattern */
+#define MAX_WCARD_PROBES 5
+
+/* one wildcard fingerprint = (response code, body size) tuple */
 typedef struct {
   long resp_code;
   curl_off_t resp_size;
-  unsigned char conn_ok;
+} wcard_fp_T;
+
+/* for wildcard check */
+typedef struct {
+  wcard_fp_T fps[MAX_WCARD_PROBES];   /* unique (code, size) tuples */
+  size_t num_fps;                     /* how many fps slots are filled */
+  bool conn_ok;
+  bool any_http_ok;                   /* any probe returned HTTP 200 */
 } wildcard_T;
 
 
@@ -170,8 +207,8 @@ typedef struct {
 
 
 /* init stuff */
-unsigned char cleanup_http(curl_T *);
-unsigned char init_http(curl_T *);
+bool cleanup_http(curl_T *);
+bool init_http(curl_T *);
 
 /* print built-in user-agent list (-A) */
 void print_useragents();
@@ -182,11 +219,11 @@ void lock_cb(CURL *, curl_lock_data, curl_lock_access, void *);
 size_t write_cb(void *, size_t, size_t, void *);
 
 /* pthread init and destroy locks */
-unsigned char kill_locks(void);
-unsigned char init_locks(void);
+bool kill_locks(void);
+bool init_locks(void);
 
 /* do http request for our attack worker thread */
-unsigned char do_req(const char *, CURL *, CURLSH *);
+bool do_req(const char *, CURL *, CURLSH *);
 
 /* randomly fetch an useragent from useragents table */
 const char *get_rand_useragent();
@@ -194,8 +231,17 @@ const char *get_rand_useragent();
 /* parse given url */
 url_T parse_url(const char *);
 
-/* connection check and wildcard detection */
-wildcard_T check_conn_wildcard(const char *);
+/* connection check and wildcard detection. proxy + proxy_creds are
+ * applied to the probe handle if non-NULL so the check goes thru the
+ * same path as the real scan workers. in_ssl mirrors opts->in_ssl
+ * so probe handles honor -i (insecure mode) like the workers do.
+ * cert/key/key_pass enable mTLS on probes (else mTLS-protected
+ * targets would 403 every probe and the scan would never start).
+ * conn_timeout mirrors opts->conn_timeout (-C) so probes don't hang
+ * 5x the user-set timeout against unreachable hosts */
+wildcard_T check_conn_wildcard(const char *, const char *, const char *,
+                               bool, const char *, const char *,
+                               const char *, long);
 
 
 #endif

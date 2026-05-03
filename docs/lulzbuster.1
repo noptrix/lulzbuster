@@ -1,0 +1,401 @@
+.\" Manpage for lulzbuster.
+.\" Contact noptrix@nullsecurity.net to correct errors or typos.
+.TH LULZBUSTER 1 "May 2026" "lulzbuster 2.0.0" "User Commands"
+
+.SH NAME
+lulzbuster \- a very fast and smart web directory and file enumeration tool
+
+.SH SYNOPSIS
+.B lulzbuster
+.B \-s
+.I url
+.RI [ options ]
+.br
+.B lulzbuster
+.B \-z
+.I session-file
+.RI [ options ]
+.br
+.B lulzbuster
+.RB { \-V | \-H | \-X }
+
+.SH DESCRIPTION
+.B lulzbuster
+is a multithreaded, very fast and smart HTTP(S) directory and file bruteforcer
+written in C on top of libcurl.
+
+Given a target URL and a wordlist, it enumerates valid paths by firing
+concurrent HTTP requests and reporting back the responses that look like real
+hits (i.e. status codes the user did not exclude).
+
+It is aimed at penetration testers, bug-bounty hunters and CTF players who want
+a small, fast, scriptable tool that does one thing well.
+
+.PP
+The scan flow is:
+.IP \(bu 2
+parse the wordlist and any user-supplied extensions (\fB\-A\fR) into a flat
+list of attack URLs;
+.IP \(bu 2
+fire a handful of probes against random URL shapes to detect a wildcard 200
+("everything answers OK") and capture its (code, size) fingerprint;
+.IP \(bu 2
+spin up
+.I N
+worker threads (\fB\-t\fR) that share a libcurl share handle for DNS, SSL
+session and connection reuse;
+.IP \(bu 2
+run each request, parse code/size/lines/words, and emit a row to stderr
+plus to any selected log files (\fB\-O\fR / \fB\-l\fR);
+.IP \(bu 2
+optionally recurse into hits whose URL ends with '/' (\fB\-d\fR);
+.IP \(bu 2
+on Ctrl+C, SIGTERM, or a global timeout (\fB\-T\fR) write a per-target
+session file so the scan can be resumed with \fB\-z\fR.
+
+.PP
+Two modes of operation are worth calling out:
+.TP
+.B Default mode
+Reports every response whose status code is not in the exclude list (\fB\-x\fR).
+Fast, but noisy on sites that return 200 to everything.
+.TP
+.B Smart mode (\fB\-S\fR)
+Uses the wildcard fingerprint plus a (code, size_bucket) clustering table
+(\fB\-K\fR) to suppress hits that look like wildcard noise. Slower because
+of the extra bookkeeping, but the output is far more actionable.
+
+.SH OPTIONS
+
+.SS Target
+.TP
+.BI \-s " url"
+Target start URL. Required for any real scan. Must be a full
+\fIhttp://\fR or \fIhttps://\fR URL.
+
+.SS HTTP
+.TP
+.BI \-h " method"
+HTTP request method (default: \fBGET\fR). Supported:
+\fBHEAD\fR, \fBGET\fR, \fBPOST\fR, \fBPUT\fR, \fBDELETE\fR, \fBOPTIONS\fR.
+Pass \fB?\fR to list them and exit.
+.TP
+.BI \-x " codes"
+Comma-separated list of HTTP status codes to exclude from the hit table
+(default: \fB400,404,500,501,502,503\fR). Use this to surface codes the
+default ignores, e.g. \fB\-x 400\fR alone keeps every other response.
+.TP
+.B \-f
+Follow HTTP redirects. Hint: appending '/' via \fB\-A '/'\fR is usually
+preferable to \fB\-f\fR because it avoids a second round-trip per word.
+.TP
+.BI \-F " num"
+Maximum number of redirects to follow (default: 0; \-1 = unlimited; only
+used together with \fB\-f\fR).
+.TP
+.BI \-u " ua"
+User-agent string (default: built-in Windows Edge).
+.TP
+.B \-U
+Pick a random user-agent from the built-in list per request. Mutually
+exclusive with \fB\-u\fR. See \fB\-X\fR to print the list.
+.TP
+.BI \-c " header"
+Custom HTTP header(s), e.g. \fB\-c 'Cookie: session=abc'\fR. Currently
+one \fB\-c\fR per scan; multiple headers go in the same string separated
+by CRLF if your shell can quote it.
+.TP
+.BI \-a " user:pass"
+HTTP authentication credentials. lulzbuster sends \fBCURLAUTH_ANY\fR, so
+auth only fires once a 401 challenge comes back.
+.TP
+.B \-r
+Auto-update the Referer header to the previous URL (curl's
+\fBCURLOPT_AUTOREFERER\fR). Only effective alongside \fB\-f\fR since
+Referer is set by curl when following a redirect.
+.TP
+.BI \-j " ver"
+HTTP version: \fB1.0\fR, \fB1.1\fR, \fB2.0\fR, \fB3.0\fR. Default is curl's
+default. \fB?\fR lists them.
+
+.SS TLS
+.TP
+.B \-i
+Insecure mode \(em skip server certificate and hostname verification.
+Useful against self-signed staging environments.
+.TP
+.BI \-E " file"
+Client certificate file (PEM) for mTLS-protected targets.
+.TP
+.BI \-y " file"
+Client key file (PEM).
+.TP
+.BI \-Y " pass"
+Passphrase for an encrypted client key.
+
+.SS Timeouts
+.TP
+.BI \-D " sec"
+Per-request delay (default: 0). Use to be polite or evade rate-limits.
+.TP
+.BI \-C " sec"
+Connect timeout (default: 10).
+.TP
+.BI \-R " sec"
+Request (read) timeout (default: 30).
+.TP
+.BI \-T " sec"
+Global wall-clock timeout. When it fires, lulzbuster behaves like the user
+hit Ctrl+C: in-flight requests finish, partial stats are printed, the
+session is saved, and the process exits.
+
+.SS Tuning
+.TP
+.BI \-t " num"
+Worker thread count (default: 30, max: implementation-defined).
+.TP
+.BI \-g " num"
+Connection cache size for libcurl (default: 30). Should match \fB\-t\fR
+for steady-state scans \(em smaller values cause connection churn.
+
+.SS Wordlist
+.TP
+.BI \-w " file"
+Wordlist file. Default:
+.I /usr/local/share/lulzbuster/lists/medium.txt
+when installed system-wide.
+.TP
+.BI \-A " list"
+Comma-separated list of extensions to append to each word, e.g.
+\fB\-A '/,.php,.bak'\fR. The bare word is also probed in addition to each
+extension, so \fB\-A '.php'\fR tests both \fB/foo\fR and \fB/foo.php\fR.
+
+.SS Proxy
+.TP
+.BI \-p " url"
+Proxy address, format: \fB<scheme>://<host>:<port>\fR. Supported schemes:
+\fBhttp\fR, \fBhttps\fR, \fBsocks4\fR, \fBsocks4a\fR, \fBsocks5\fR,
+\fBsocks5h\fR. \fB?\fR lists them.
+.TP
+.BI \-P " user:pass"
+Proxy authentication credentials.
+
+.SS Body filter
+.TP
+.BI \-m " size"
+Skip hits whose body is smaller than \fIsize\fR bytes. Suffixes
+\fBK\fR, \fBM\fR, \fBG\fR are accepted (e.g. \fB\-m 10K\fR).
+.TP
+.BI \-M " size"
+Skip hits whose body is bigger than \fIsize\fR bytes. Same suffix syntax
+as \fB\-m\fR.
+.TP
+.BI \-b " regex"
+Keep only hits whose response body matches the given POSIX extended
+regex, e.g. \fB\-b 'admin|login'\fR. Complements
+.BR \-x ", " \-m " and " \-M
+for noisy targets where the status code and body size alone are not
+discriminating (CMS soft-404s, single-page apps, etc.). The regex is
+evaluated against the first \(~1 MiB of body.
+.TP
+.BI \-B " regex"
+Drop hits whose response body matches the given POSIX extended regex,
+e.g. \fB\-B 'page not found'\fR. The hit is filtered out before
+\fB\-S\fR cluster bookkeeping, so suppression thresholds are not
+polluted by content-filtered noise. Same buffering rules as \fB\-b\fR.
+
+.SS Smart mode
+.TP
+.B \-S
+Enable smart mode: wildcard-fingerprint suppression plus
+(code, size_bucket) cluster suppression. Recommended for any target you
+do not already know is wildcard-clean.
+.TP
+.BI \-K " num"
+Cluster threshold for smart mode (default: 8). After
+.I num
+hits with the same (code, size_bucket) tuple, further matches in that
+cluster are suppressed as wildcard noise.
+
+.SS Recursion
+.TP
+.BI \-d " depth"
+Maximum recursion depth (default: 0 = no recursion). lulzbuster recurses
+into hits whose URL ends with '/' and returned one of
+\fB200, 301, 302, 401, 403\fR.
+.TP
+.BI \-e " list"
+Comma-separated list of substrings; URLs matching any are excluded from
+recursion (e.g. \fB\-e '/admin/,logout'\fR). The hit itself is still
+reported, only the descent is skipped.
+
+.SS Output
+.TP
+.BI \-l " file"
+Log hits to a file. With a single \fB\-O\fR format the path is used
+verbatim; with multiple formats the path is treated as a stem and
+\fB.<ext>\fR is appended per format. Without \fB\-O\fR, \fB\-l\fR
+implies the default \fBlog\fR (text) format.
+.TP
+.BI \-O " formats"
+Opt-in logging plus format selection. Accepts \fBlog\fR, \fBcsv\fR,
+\fBjsonl\fR, \fBall\fR, or a comma-list (e.g. \fB\-O log,jsonl\fR).
+Without \fB\-l\fR, each format gets an auto-derived filename based on
+the start URL (e.g. \fIhttps-www-example-com.csv\fR).
+.TP
+.B \-N
+Disable colored output on stderr. Also auto-disabled when stderr is
+not a TTY or when the
+.B NO_COLOR
+environment variable is set. Logfiles are always plain text regardless
+of this flag.
+
+.SS Other
+.TP
+.BI \-n " list"
+Nameservers (default:
+.IR 1.1.1.1,8.8.8.8,208.67.222.222 ).
+Comma-separated.
+.TP
+.BI \-z " file"
+Resume from a previously written session file. The session captures
+\fB\-s\fR, \fB\-w\fR, \fB\-A\fR, \fB\-S\fR/\fB\-K\fR, \fB\-d\fR/\fB\-e\fR
+and the word offset reached at interrupt time. Wordlist mtime/size are
+verified to refuse mismatched resumes.
+
+.SS Misc
+.TP
+.B \-X
+Print the built-in user-agent list and exit.
+.TP
+.B \-V
+Print the version and exit.
+.TP
+.B \-H
+Print the help screen and exit.
+
+.SH EXAMPLES
+.PP
+Plain scan against a target with the default wordlist:
+.PP
+.nf
+.RS
+$ lulzbuster -s https://example.com/
+.RE
+.fi
+.PP
+Smart-mode scan with PHP/HTML extensions, recursion two levels deep, and
+multi-format logging:
+.PP
+.nf
+.RS
+$ lulzbuster -s https://target/ -w lists/big.txt \\
+             -A '.php,.html,/' -S -d 2 -O all
+.RE
+.fi
+.PP
+Polite scan via a SOCKS5 proxy with a 200ms delay:
+.PP
+.nf
+.RS
+$ lulzbuster -s http://intranet.local/ -t 5 -D 1 \\
+             -p socks5h://127.0.0.1:9050
+.RE
+.fi
+.PP
+Resume an interrupted scan:
+.PP
+.nf
+.RS
+$ lulzbuster -z https-target-com.session
+.RE
+.fi
+
+.SH FILES
+.TP
+.I /usr/local/share/lulzbuster/lists/
+Bundled wordlists (\fIsmall.txt\fR, \fImedium.txt\fR, \fIbig.txt\fR).
+The default
+.B \-w
+points to
+.IR medium.txt .
+.TP
+.IB <stem> .session
+Per-target session file written on interrupt, where
+.I <stem>
+is derived from the start URL (e.g.
+.IR https-example-com.session ).
+The path is also printed at exit time.
+.TP
+.IB <stem> .{log,csv,jsonl}
+Auto-derived hit log files when
+.B \-O
+is used without
+.BR \-l .
+
+.SH SIGNALS
+.TP
+.B SIGINT
+Ctrl+C. Triggers a graceful exit: in-flight requests are allowed to finish,
+partial stats are printed, the session file is written, and the process
+exits with success status.
+.TP
+.B SIGTERM
+Polite kill(1). Same handler as
+.BR SIGINT .
+.TP
+.B SIGALRM
+Internally raised when
+.B \-T
+fires. Same effect as
+.BR SIGINT .
+
+.SH ENVIRONMENT
+.TP
+.B NO_COLOR
+If set (any value), ANSI color escapes are not emitted. Equivalent to
+passing
+.BR \-N .
+
+.SH EXIT STATUS
+.TP
+.B 0
+Scan completed (with or without hits) or was interrupted gracefully.
+.TP
+.B 1
+Fatal error during startup, argument parsing, or unrecoverable HTTP/system
+error mid-run.
+
+.SH NOTES
+.IP \(bu 2
+HTTP/2 multiplexing is not used \(em each worker thread holds its own easy
+handle. Connection reuse across threads still works via libcurl's share
+handle.
+.IP \(bu 2
+Hit clustering (\fB\-S\fR) is order-sensitive: which 8 hits in a cluster
+are printed before suppression depends on worker scheduling. The total
+"hits printed / hits suppressed" stats are deterministic.
+.IP \(bu 2
+The session-file format carries a version key (\fBSESSION_VERSION\fR) and
+mismatched resumes are refused with an error.
+
+.SH BUGS
+Report bugs, crashes, false-positives, regressions or general feedback to
+.MT noptrix@nullsecurity.net
+noptrix@nullsecurity.net
+.ME .
+Please include the full command line, the
+.B \-V
+output, and a short description of the target environment when filing.
+
+.SH AUTHOR
+Written by Levon 'noptrix' Kayan
+.MT <noptrix@nullsecurity.net>
+noptrix@nullsecurity.net
+.ME .
+
+.SH SEE ALSO
+.BR curl (1),
+
+.SH COPYRIGHT
+See the LICENSE file shipped with this distribution.

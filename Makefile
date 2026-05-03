@@ -59,21 +59,37 @@ INSTDIR = $(DESTDIR)/bin
 SHAREDIR = $(DESTDIR)/share/lulzbuster
 DOCDIR = $(DESTDIR)/share/doc/lulzbuster
 LICENSEDIR = $(DESTDIR)/share/licenses/lulzbuster
+MANDIR = $(DESTDIR)/share/man/man1
 
 INCDIR = inc
 SRCDIR = src
 
+# release build: lean + fast. uncomment the dev block below for ASan + debug
 CFLAGS += -W -Wall -Wextra -O2 -pthread -I $(INCDIR)
+CFLAGS += -MMD -MP
+CFLAGS += -flto -fno-plt -pipe -DNDEBUG
+CFLAGS += -ffunction-sections -fdata-sections
+
+# dev/debug build (uncomment to enable). includes ASan, fortify-source,
+# stack protector, RELRO/now, full debug info. slower + larger but
+# catches memory bugs and gives readable backtraces
 #CFLAGS += -W -Wall -Wextra -O2 -g -g3 -ggdb -fstack-protector-all -fPIE -fPIC
 #CFLAGS += -pthread -D_FORTIFY_SOURCE=2 -Wl,-z,now -Wl,-z,relro
 #CFLAGS += -fsanitize=address -I $(INCDIR)
+#CFLAGS += -MMD -MP
 
-LDFLAGS = -lcurl
+LDFLAGS = -lcurl -Wl,--gc-sections -flto
 
 OBJS = $(SRCDIR)/lulzbuster.o $(SRCDIR)/help.o $(SRCDIR)/checks.o
 OBJS += $(SRCDIR)/wrapper.o $(SRCDIR)/error.o $(SRCDIR)/opts.o $(SRCDIR)/http.o
 OBJS += $(SRCDIR)/misc.o $(SRCDIR)/thpool.o $(SRCDIR)/attack.o
-OBJS += $(SRCDIR)/signals.o
+OBJS += $(SRCDIR)/signals.o $(SRCDIR)/session.o $(SRCDIR)/log.o
+DEPS = $(OBJS:.o=.d)
+
+# silently include the per-object header-dep files. on a clean tree they
+# don't exist yet (leading - swallows the warning); the first compile
+# generates them and subsequent rebuilds pick up header changes
+-include $(DEPS)
 
 $(SRCDIR)%.o: %.c
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -92,23 +108,32 @@ default:
 
 lulzbuster: $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
-	$(STRIP) -R .gnu.version -R .note.gnu.build-i -R .note.ABI-tag -g -S -d \
-		--strip-debug --strip-dwo -s lulzbuster
+	$(STRIP) -s -g -S -d --strip-debug --strip-dwo --strip-unneeded \
+		-R .comment \
+		-R .gnu.version \
+		-R .gnu_debuglink \
+		-R .note.ABI-tag \
+		-R .note.gnu.build-id \
+		-R .note.gnu.property \
+		lulzbuster
 
 install:
 	$(MKDIR) $(INSTDIR)
 	$(MKDIR) $(SHAREDIR)
 	$(MKDIR) $(DOCDIR)
 	$(MKDIR) $(LICENSEDIR)
+	$(MKDIR) $(MANDIR)
 	$(CP) lists $(SHAREDIR)/lists
 	$(CP) docs/LICENSE $(LICENSEDIR)/
 	$(CP) docs/* $(DOCDIR)/
-	$(RM) $(DOCDIR)/LICENSE
+	$(RM) $(DOCDIR)/LICENSE $(DOCDIR)/lulzbuster.1
+	$(CP) docs/lulzbuster.1 $(MANDIR)/
 	$(MV) lulzbuster $(INSTDIR)/
 
 uninstall:
-	$(RM) $(INSTDIR)/lulzbuster $(SHAREDIR) $(DOCDIR) $(LICENSEDIR)
+	$(RM) $(INSTDIR)/lulzbuster $(SHAREDIR) $(DOCDIR) $(LICENSEDIR) \
+		$(MANDIR)/lulzbuster.1
 
 clean:
-	$(RM) lulzbuster $(SRCDIR)/*.o *.core core *vgcore*
+	$(RM) lulzbuster $(SRCDIR)/*.o $(SRCDIR)/*.d *.core core *vgcore*
 

@@ -8,8 +8,17 @@
  *
  ********************************/
 
-#include <unistd.h>
+/* feature-test macros must be set before any system header is pulled in.
+ * _POSIX_C_SOURCE alone hides usleep() in glibc, so add _DEFAULT_SOURCE
+ * to keep BSD/GNU extensions available */
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
+
+#include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -76,6 +76,10 @@ char **parse_str_token(char *, const char *, const unsigned char);
 /* parse string with given delimiter and length to long int values */
 long int *parse_str_toint_token(char *, const char *, const unsigned char);
 
+/* parse a "<num>[suffix]" size into bytes. suffix: K/M/G (1024^N).
+ * returns -1 on invalid input, otherwise the byte count */
+long long parse_size(const char *);
+
 
 #endif
 

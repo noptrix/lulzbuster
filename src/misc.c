@@ -18,6 +18,9 @@
 
 
 /* sys includes */
+#include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
 
 
 /* own includes */
@@ -40,31 +43,29 @@ char **build_urls(const char *url, char **wordlist, const size_t num_words,
     fmtstr = "%s%s%s";
   }
 
-  /* sum items: words * extensions + 1 (NULL ptr for END) */
-  sum = num_words * num_extens + 1;
+  /* total real urls. +1 slot for the trailing NULL terminator */
+  sum = num_words * num_extens;
+  urls = xcalloc(sum + 1, sizeof (char *));
 
-  /* we definetely force to end URL with '/' but we ignore multiple '/'
-   * appended to start url via cmdline. */
-  urls = xcalloc(sum + num_extens, sizeof (char *));
-  while (i < sum) {
-    for (j = 0; j < num_extens; ++j) {
-      for (k = 0; k < num_words + 1; ++k) {
-        line_len = snprintf(NULL, 0, fmtstr, url, wordlist[k], extens[j]) + 1;
-        urls[i] = xcalloc(1, line_len);
-        snprintf(urls[i], line_len, fmtstr, url, wordlist[k], extens[j]);
-        ++i;
-      }
+  for (j = 0; j < num_extens; ++j) {
+    for (k = 0; k < num_words; ++k) {
+      line_len = snprintf(NULL, 0, fmtstr, url, wordlist[k], extens[j]) + 1;
+      urls[i] = xcalloc(1, line_len);
+      snprintf(urls[i], line_len, fmtstr, url, wordlist[k], extens[j]);
+      ++i;
     }
   }
 
-  /* cheat a bit and mark end */
+  /* mark end */
   urls[i] = NULL;
 
   return urls;
 }
 
 
-/* read lines from a file. kill <lastchar> with 0x00 if given. count lines */
+/* read lines from a file. kill <lastchar> with 0x00 if given. count lines.
+ * uses a stack scratch buffer for fgets() and shrinks each kept line down to
+ * its real length, which dramatically lowers heap usage on big wordlists */
 char **read_lines(const char *filename, size_t line_len, size_t *num_lines,
                   const int lastchar)
 {
@@ -84,23 +85,25 @@ char **read_lines(const char *filename, size_t line_len, size_t *num_lines,
     line_len = DEF_LINE_LEN;
   }
 
+  /* scratch buffer reused across iterations - we copy out only what we need */
+  char scratch[line_len];
+
   lines = xcalloc(1, sizeof (char *));
-  do {
-    lines[*num_lines] = xcalloc(1, line_len);
-    if (fgets(lines[*num_lines], line_len, fp) == NULL) {
-      fclose(fp);
-      return lines;
-    }
-    cur_len = strlen(lines[*num_lines]);
-    last = cur_len - 1;
+  while (fgets(scratch, line_len, fp) != NULL) {
+    cur_len = strlen(scratch);
     if (cur_len != 0) {
-      if (lastchar != 0 && (lines[*num_lines][last] == lastchar)) {
-        lines[*num_lines][last] = 0x00; /* kill newline */
+      last = cur_len - 1;
+      if (lastchar != 0 && scratch[last] == lastchar) {
+        scratch[last] = 0x00; /* kill newline */
+        cur_len = last;
       }
     }
+    lines[*num_lines] = xcalloc(1, cur_len + 1);
+    memcpy(lines[*num_lines], scratch, cur_len);
     ++(*num_lines);
     lines = xrealloc(lines, sizeof (char *) * (*num_lines + 1));
-  } while (!feof(fp));
+    lines[*num_lines] = NULL;
+  }
 
   fclose(fp);
 
@@ -112,11 +115,12 @@ char **read_lines(const char *filename, size_t line_len, size_t *num_lines,
 char *touplow(const char *str, const char *to)
 {
   size_t i = 0;
-  size_t len = strlen(str) + 1;
+  size_t len = strlen(str);
   char *newstr = NULL;
-  int (*fptr)(const int);
+  int (*fptr)(int);
 
-  newstr = xcalloc(len, sizeof (char *));
+  /* +1 for trailing NUL; xcalloc zero-fills so we don't need to set it */
+  newstr = xcalloc(len + 1, sizeof(char));
 
   if (!(strcmp(to, "up"))) {
     fptr = toupper;
@@ -125,28 +129,45 @@ char *touplow(const char *str, const char *to)
   }
 
   for (i = 0; i < len; i++) {
-    newstr[i] = fptr(str[i]);
+    newstr[i] = fptr((unsigned char) str[i]);
   }
-
-  newstr[len] = 0x00;
 
   return newstr;
 }
 
 
-/* parse string with given delimiter and create a char **foo. */
+/* parse string with given delimiter and create a NULL-terminated
+ * char**. unlike strtok() this preserves empty tokens, so input like
+ * ",.bak" or ":foo" yields ["", ".bak"] / ["", "foo"] instead of
+ * silently dropping the leading empty. caller keeps the input buffer
+ * alive (we NUL-terminate in place and hand back interior pointers).
+ * delim is a charset like strtok */
 char **parse_str_token(char *str, const char *delim,
                        const unsigned char num_substr)
 {
   char **parsed = NULL;
-  int i = 0;
+  int n = 0;
+  char *p = NULL, *start = NULL;
 
   parsed = xcalloc(num_substr, sizeof(char *));
 
-  for (i = 0; i < num_substr - 1; ++i, str = NULL) {
-    if ((parsed[i] = strtok(str, delim)) == NULL) {
-      break;
+  if (str == NULL) {
+    return parsed;
+  }
+
+  start = str;
+  for (p = str; *p != '\0'; ++p) {
+    if (strchr(delim, *p) != NULL) {
+      if (n >= num_substr - 1) break;
+      *p = '\0';
+      parsed[n++] = start;
+      start = p + 1;
     }
+  }
+  /* trailing token (or the whole string when no delim was hit). also
+   * captures the empty tail in cases like "foo," */
+  if (n < num_substr - 1) {
+    parsed[n] = start;
   }
 
   return parsed;
@@ -180,5 +201,42 @@ long int *parse_str_toint_token(char *str, const char *delim,
   free(parsed);
 
   return iparsed;
+}
+
+
+/* parse "<num>[suffix]" into bytes. accepts an optional trailing
+ * K/M/G (case-insensitive) for 1024^1/1024^2/1024^3, default unit is
+ * bytes. examples: "100", "10K", "5M", "1G". returns -1 on garbage,
+ * negative or overflow */
+long long parse_size(const char *s)
+{
+  long long val = 0;
+  char *end = NULL;
+
+  if (s == NULL || *s == '\0') {
+    return -1;
+  }
+
+  errno = 0;
+  val = strtoll(s, &end, 10);
+  if (end == s || val < 0 || errno == ERANGE) {
+    return -1;
+  }
+
+  /* allow exactly one suffix char then EOS, nothing else */
+  if (*end != '\0') {
+    char c = (char) tolower((unsigned char) *end);
+    if (end[1] != '\0') {
+      return -1;
+    }
+    switch (c) {
+      case 'k': val *= 1024LL; break;
+      case 'm': val *= 1024LL * 1024LL; break;
+      case 'g': val *= 1024LL * 1024LL * 1024LL; break;
+      default:  return -1;
+    }
+  }
+
+  return val;
 }
 

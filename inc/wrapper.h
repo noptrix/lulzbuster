@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 
 /* own includes */
@@ -41,10 +42,14 @@
  ******************************************************************************/
 
 
-/* clear, right? */
-#define FALSE 0x00
-#define TRUE  0x01
+/* tri-state sentinel for the few check_*() funcs that need a third value
+ * beyond bool true/false (e.g. user passed '?' to list available choices
+ * and we should print + exit cleanly). those funcs return unsigned char,
+ * everything else uses <stdbool.h> bool */
 #define ASK   0x02
+
+/* curl-style long flags - kept as longs because that's what curl_easy_setopt
+ * wants for its boolean-ish options */
 #define OFF   0L
 #define ON    1L
 

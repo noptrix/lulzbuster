@@ -52,6 +52,13 @@ typedef void sigfunc(int);
  ******************************************************************************/
 
 
+/* set by sig_int, polled by attack() workers and the curl progress
+ * callback so a ctrl+c bails the scan gracefully (instead of _exit).
+ * sig_atomic_t + volatile = the only things you can write from a
+ * signal handler portably */
+extern volatile sig_atomic_t g_interrupted;
+
+
 /*******************************************************************************
  * FUNCTION PROTOTYPES
  ******************************************************************************/
