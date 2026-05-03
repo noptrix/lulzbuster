@@ -1,7 +1,7 @@
 # Description
 
-`lulzbuster` is a multithreaded, very fast and smart HTTP(S) directory and file
-bruteforcer written in C on top of libcurl.
+A multithreaded, very fast and smart HTTP(S) directory and file bruteforcer
+written in C on top of libcurl.
 
 Given a target URL and a wordlist, it enumerates valid paths by firing
 concurrent HTTP requests and reporting back the responses that look like real
