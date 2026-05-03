@@ -10,29 +10,6 @@ hits (i.e. status codes the user did not exclude).
 It is aimed at penetration testers, bug-bounty hunters and CTF players who want
 a small, fast, scriptable tool that does one thing well.
 
-The scan flow is:
-
-- parse the wordlist and any user-supplied extensions (`-A`) into a flat list
-  of attack URLs;
-- fire a handful of probes against random URL shapes to detect a wildcard 200
-  ("everything answers OK") and capture its (code, size) fingerprint;
-- spin up *N* worker threads (`-t`) that share a libcurl share handle for DNS,
-  SSL session and connection reuse;
-- run each request, parse code/size/lines/words, and emit a row to stderr plus
-  to any selected log files (`-O` / `-l`);
-- optionally recurse into hits whose URL ends with `/` (`-d`);
-- on Ctrl+C, SIGTERM, or a global timeout (`-T`) write a per-target session
-  file so the scan can be resumed with `-z`.
-
-Two modes of operation are worth calling out:
-
-- **Default mode** — reports every response whose status code is not in the
-  exclude list (`-x`). Fast, but noisy on sites that return 200 to everything.
-- **Smart mode** (`-S`) — uses the wildcard fingerprint plus a
-  (code, size_bucket) clustering table (`-K`) to suppress hits that look like
-  wildcard noise. Slower because of the extra bookkeeping, but the output is
-  far more actionable.
-
 # Usage
 
 ```
