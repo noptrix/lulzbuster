@@ -247,10 +247,20 @@ void thpool_destroy(thpool_* thpool_p){
 		usleep(500000);
 	}
 
+	/* join every worker so we don't return until threads have fully
+	 * terminated (their TSD destructors, incl. per-thread curl handle
+	 * cleanup, have run). the poll loops above already woke them and
+	 * dropped num_threads_alive to 0, so these joins don't block long.
+	 * without this the caller could destroy the shared curl locks while
+	 * an exiting worker was still using them */
+	int n;
+	for (n=0; n < threads_total; n++){
+		pthread_join(thpool_p->threads[n]->pthread, NULL);
+	}
+
 	/* Job queue cleanup */
 	jobqueue_destroy(&thpool_p->jobqueue);
 	/* Deallocs */
-	int n;
 	for (n=0; n < threads_total; n++){
 		thread_destroy(thpool_p->threads[n]);
 	}
@@ -308,7 +318,11 @@ static int thread_init (thpool_* thpool_p, struct thread** thread_p, int id){
 	(*thread_p)->id       = id;
 
 	pthread_create(&(*thread_p)->pthread, NULL, (void *)thread_do, (*thread_p));
-	pthread_detach((*thread_p)->pthread);
+	/* joinable (not detached): thpool_destroy pthread_join's each worker so
+	 * it cannot return while a thread is still exiting. that matters because
+	 * thread exit runs TSD destructors (e.g. the per-thread curl handle
+	 * cleanup) which touch the shared curl locks - the caller tears those
+	 * down right after thpool_destroy */
 	return 0;
 }
 
@@ -477,11 +491,8 @@ static void jobqueue_push(jobqueue* jobqueue_p, struct job* newjob){
 
 
 /* Get first job from queue(removes it from queue)
-<<<<<<< HEAD
  *
  * Notice: Caller MUST hold a mutex
-=======
->>>>>>> da2c0fe45e43ce0937f272c8cd2704bdc0afb490
  */
 static struct job* jobqueue_pull(jobqueue* jobqueue_p){
 

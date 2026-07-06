@@ -1,6 +1,6 @@
 .\" Manpage for lulzbuster.
 .\" Contact noptrix@nullsecurity.net to correct errors or typos.
-.TH LULZBUSTER 1 "May 2026" "lulzbuster 2.0.0" "User Commands"
+.TH LULZBUSTER 1 "July 2026" "lulzbuster 2.0.1" "User Commands"
 
 .SH NAME
 lulzbuster \- a very fast and smart web directory and file enumeration tool
@@ -90,7 +90,7 @@ Follow HTTP redirects. Hint: appending '/' via \fB\-A '/'\fR is usually
 preferable to \fB\-f\fR because it avoids a second round-trip per word.
 .TP
 .BI \-F " num"
-Maximum number of redirects to follow (default: 0; \-1 = unlimited; only
+Maximum number of redirects to follow (default: \-1 = unlimited; only
 used together with \fB\-f\fR).
 .TP
 .BI \-u " ua"
@@ -152,11 +152,13 @@ session is saved, and the process exits.
 .SS Tuning
 .TP
 .BI \-t " num"
-Worker thread count (default: 30, max: implementation-defined).
+Worker thread count (default: 35, max: implementation-defined).
 .TP
 .BI \-g " num"
-Connection cache size for libcurl (default: 30). Should match \fB\-t\fR
-for steady-state scans \(em smaller values cause connection churn.
+Per-thread connection cache size for libcurl (default: 35). Each worker
+thread keeps its own connection cache, so a single connection per host is
+enough for steady-state scanning; larger values only help when one thread
+talks to many hosts (e.g. recursion following redirects to other vhosts).
 
 .SS Wordlist
 .TP

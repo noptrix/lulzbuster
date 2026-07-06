@@ -46,8 +46,8 @@
 #define DEF_HTTP_METHOD         "GET"
 #define DEF_WORDLIST            "/usr/local/share/lulzbuster/lists/medium.txt"
 #define DEF_USERAGENT           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
-  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 " \
-  "Edg/142.0.0.0"
+  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 " \
+  "Edg/150.0.0.0"
 #define DEF_RAND_UA             false
 #define DEF_AUTOREF_UPDATE      false
 #define DEF_THREADS             35
@@ -89,7 +89,7 @@ struct hit_table;
 
 /* contains every options (cmdline, default, etc.) */
 typedef struct {
-  const char *start_url;            /* target start url (-u) */
+  const char *start_url;            /* target start url (-s) */
   url_T parsed_url;                 /* parsed start_url */
   char **attack_urls;               /* dyn. built attack urls */
   unsigned long num_attack_urls;    /* num attack urls */
@@ -97,9 +97,9 @@ typedef struct {
   long int *http_ex_codes;          /* exclude http status codes (-x) */
   size_t num_http_ex_codes;         /* num excluded http status codes */
   bool follow_redir;                /* follow redirect (-f) */
-  long follow_redir_level;          /* max level to follow redirect (-i) */
-  char *useragent;                  /* user-agent string (-U) */
-  bool rand_ua;                     /* random user-agent (-G) */
+  long follow_redir_level;          /* max level to follow redirect (-F) */
+  char *useragent;                  /* user-agent string (-u) */
+  bool rand_ua;                     /* random user-agent (-U) */
   const char *http_header;          /* custom http header (-c) */
   const char *creds;                /* creds for http auth (-a) */
   bool autoref;                     /* auto update referrer (-r) */
@@ -111,7 +111,7 @@ typedef struct {
   unsigned short int threads;       /* num threads (-t) */
   long conn_cache;                  /* num connection cache for curl (-g) */
   const char *wordlist;             /* wordlist file (-w) */
-  char **extens;                    /* extension list (-E) */
+  char **extens;                    /* extension list (-A) */
   size_t num_extens;                /* num extensions */
   char *proxy;                      /* http proxy address (-p) */
   const char *proxy_creds;          /* creds for proxy auth (-P) */
@@ -120,7 +120,7 @@ typedef struct {
   const char *key_file;             /* client key PEM  (-y) for mTLS */
   const char *key_pass;             /* passphrase (-Y) for encrypted key */
   bool no_color;                    /* force colored output off (-N) */
-  bool smart;                       /* anti-smart mode (-S) */
+  bool smart;                       /* smart mode (-S) */
   unsigned short int cluster_threshold; /* smart cluster threshold (-K) */
   unsigned short int recurse_depth; /* max recursion depth (-d), 0 = off */
   char **exclude_paths;             /* dirs/paths to skip in recursion (-e) */

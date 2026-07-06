@@ -35,6 +35,36 @@
  * across desktop / mobile / bot. order doesn't matter, get_rand_useragent
  * picks uniformly at random */
 static useragents_T useragents[] = {
+  /* === latest (pulled from vendor version APIs, jul 2026): chrome/edge 150,
+   * firefox 152 + esr 140, safari 26 / ios 26.5, android 17. the default UA
+   * in opts.h tracks the newest edge below === */
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"},
+  {"windows", "edge", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"},
+  {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0"},
+  {"windows", "firefox", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0"},
+  {"windows", "opera", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 OPR/136.0.0.0"},
+  {"windows", "vivaldi", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Vivaldi/7.6"},
+  {"windows", "brave", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15"},
+  {"macos", "safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Safari/605.1.15"},
+  {"macos", "chrome", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"},
+  {"macos", "edge", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"},
+  {"macos", "firefox", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:152.0) Gecko/20100101 Firefox/152.0"},
+  {"linux", "chrome", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"},
+  {"linux", "firefox", "Mozilla/5.0 (X11; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0"},
+  {"linux", "edge", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 17; Pixel 10 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36"},
+  {"android", "chrome", "Mozilla/5.0 (Linux; Android 16; SM-S938B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36"},
+  {"android", "firefox", "Mozilla/5.0 (Android 17; Mobile; rv:152.0) Gecko/152.0 Firefox/152.0"},
+  {"android", "samsung", "Mozilla/5.0 (Linux; Android 17; SAMSUNG SM-S938B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/28.0 Chrome/145.0.0.0 Mobile Safari/537.36"},
+  {"ios", "safari", "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/22F76 Safari/604.1"},
+  {"ios", "safari", "Mozilla/5.0 (iPad; CPU OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/22F76 Safari/604.1"},
+  {"ios", "chrome", "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/150.0.0.0 Mobile/22F76 Safari/604.1"},
+
   /* === windows desktop === */
   {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"},
   {"windows", "chrome", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"},
@@ -209,6 +239,11 @@ static useragents_T useragents[] = {
 /* pthread mutex locks */
 static pthread_mutex_t locks[NUM_LOCKS];
 
+/* whether init_locks() armed the mutexes above. lets kill_locks() no-op on
+ * early-exit paths (help/version/bad args) that never started a scan, and
+ * lets cleanup_http() destroy them unconditionally after curl_share_cleanup */
+static bool g_locks_inited = false;
+
 
 /* generate a random url for the given pattern index. each pattern
  * resembles a different URL "shape" the user might scan, so we can
@@ -271,7 +306,9 @@ static char *rand_url(const char *url, size_t pattern_idx)
 wildcard_T check_conn_wildcard(const char *url, const char *proxy,
                                const char *proxy_creds, bool in_ssl,
                                const char *cert, const char *key,
-                               const char *key_pass, long conn_timeout)
+                               const char *key_pass, long conn_timeout,
+                               const char *useragent, const char *http_method,
+                               const char *http_header, const char *nameserver)
 {
   wildcard_T wcard = {0};
   size_t i = 0, j = 0;
@@ -279,6 +316,16 @@ wildcard_T check_conn_wildcard(const char *url, const char *proxy,
   /* mirror set_http_options(): default verifies, -i flips both off */
   long verify_peer = in_ssl ? 0L : 1L;
   long verify_host = in_ssl ? 0L : 2L;
+  /* mirror the worker header set: curl's default Accept is killed and
+   * any -c custom header is appended, so a vhost/Accept-sensitive
+   * target fingerprints the same way it will for the real requests.
+   * built once and reused across every probe handle, freed at the end */
+  bool head = (http_method != NULL && strcmp(http_method, "HEAD") == 0);
+  struct curl_slist *hdrs = NULL;
+  hdrs = curl_slist_append(hdrs, "Accept:");
+  if (http_header != NULL) {
+    hdrs = curl_slist_append(hdrs, http_header);
+  }
 
   for (i = 0; i < MAX_WCARD_PROBES; ++i) {
     char *randurl = rand_url(url, i);
@@ -300,6 +347,14 @@ wildcard_T check_conn_wildcard(const char *url, const char *proxy,
     if (cert)     curl_easy_setopt(curl, CURLOPT_SSLCERT, cert);
     if (key)      curl_easy_setopt(curl, CURLOPT_SSLKEY, key);
     if (key_pass) curl_easy_setopt(curl, CURLOPT_KEYPASSWD, key_pass);
+    /* mirror -u/-U, -h and -n so the probe request shape matches the
+     * workers'. HEAD also flips NOBODY like set_http_options() does */
+    if (useragent)   curl_easy_setopt(curl, CURLOPT_USERAGENT, useragent);
+    if (http_method) curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST,
+                                      http_method);
+    if (head)        curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+    if (nameserver)  curl_easy_setopt(curl, CURLOPT_DNS_SERVERS, nameserver);
+    if (hdrs)        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, hdrs);
     if (proxy != NULL) {
       curl_easy_setopt(curl, CURLOPT_PROXY, proxy);
       if (proxy_creds != NULL) {
@@ -337,6 +392,8 @@ wildcard_T check_conn_wildcard(const char *url, const char *proxy,
     free(randurl);
     curl_easy_cleanup(curl);
   }
+
+  curl_slist_free_all(hdrs);
 
   return wcard;
 }
@@ -420,6 +477,10 @@ bool cleanup_http(curl_T *curl)
 {
   curl_slist_free_all(curl->list);
   curl_share_cleanup(curl->sh);
+  /* destroy the share locks only AFTER curl_share_cleanup: libcurl calls
+   * lock_cb/unlock_cb while tearing the share down, so the mutexes must
+   * still be valid here. no-op when the scan never armed them */
+  kill_locks();
   curl_easy_cleanup(curl->eh);
   curl_global_cleanup();
 
@@ -495,12 +556,16 @@ bool kill_locks(void)
 {
   register size_t i = 0;
 
+  if (!g_locks_inited) {
+    return true;  /* nothing armed (early exit before a scan) */
+  }
   for (i = 0; i < NUM_LOCKS; ++i) {
     if (pthread_mutex_destroy(&locks[i]) != 0) {
       err(W_PTHR_MX_DSTR);
       return false;
     }
   }
+  g_locks_inited = false;
 
   return true;
 }
@@ -517,6 +582,7 @@ bool init_locks(void)
       return false;
     }
   }
+  g_locks_inited = true;
 
   return true;
 }

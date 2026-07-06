@@ -95,6 +95,29 @@ static unsigned short int g_cur_level = 0;   /* 0 = initial, >=1 = recursing */
 static size_t g_curjob = 0;
 
 
+/* one persistent curl easy handle per worker thread, stashed in TLS and
+ * reused across all of that thread's requests. this is what buys us
+ * keep-alive connection reuse: we deliberately don't share the connection
+ * cache across threads (that races inside libcurl and segfaults), so reuse
+ * has to live inside each thread's own handle. the key destructor frees
+ * the handle on thread exit - and since thpool builds a fresh pool per
+ * recursion level, that cleanup runs per level, not just once */
+static pthread_key_t g_eh_key;
+static pthread_once_t g_eh_once = PTHREAD_ONCE_INIT;
+
+static void eh_destructor(void *p)
+{
+  if (p != NULL) {
+    curl_easy_cleanup((CURL *) p);
+  }
+}
+
+static void eh_key_make(void)
+{
+  pthread_key_create(&g_eh_key, eh_destructor);
+}
+
+
 /* recursion candidate http codes - dirs that look 'real' and worth diving
  * into. 200 = ok, 301/302 = redirect (often slash-add), 401/403 =
  * existing but auth/perms */
@@ -408,11 +431,17 @@ static void *attack(job_T *job)
     __STATUS;
   }
 
-  /* duplicate easy handle here (in worker) so we don't pre-allocate
-   * num_attack_urls easy handles upfront (huge memory saver) */
-  eh = curl_easy_duphandle(job->opts->curl->eh);
+  /* grab this thread's persistent handle, duping it from the template on
+   * first use. reused for every subsequent request on this thread so the
+   * connection stays warm between requests */
+  pthread_once(&g_eh_once, eh_key_make);
+  eh = pthread_getspecific(g_eh_key);
   if (eh == NULL) {
-    return NULL;
+    eh = curl_easy_duphandle(job->opts->curl->eh);
+    if (eh == NULL) {
+      return NULL;
+    }
+    pthread_setspecific(g_eh_key, eh);
   }
 
   /* opt-in body capture for -b/-B regex matching. only allocate when
@@ -578,10 +607,9 @@ static void *attack(job_T *job)
   }
 
 out:
-  /* unified cleanup so every early-return path frees the body buffer
-   * (when allocated) and the duplicated easy handle */
+  /* only free the per-request body buffer here. the easy handle is
+   * thread-local and reused, freed by eh_destructor on thread exit */
   free(stats.buf);
-  curl_easy_cleanup(eh);
 
   return NULL;
 }
@@ -778,7 +806,7 @@ void launch_attack(opts_T *opts)
       for (i = 0; i < qd_n; ++i) free(qd[i]);
       free(qd);
     }
-    kill_locks();
+    /* locks are destroyed in cleanup_http() after curl_share_cleanup() */
     {
       int f;
       for (f = 0; f < LOG_FMT_COUNT; ++f) {
@@ -817,7 +845,11 @@ void launch_attack(opts_T *opts)
       opts->wcard = check_conn_wildcard(targets[t], opts->proxy,
                                         opts->proxy_creds, opts->in_ssl,
                                         opts->cert_file, opts->key_file,
-                                        opts->key_pass, opts->conn_timeout);
+                                        opts->key_pass, opts->conn_timeout,
+                                        opts->rand_ua ? get_rand_useragent()
+                                                      : opts->useragent,
+                                        opts->http_method, opts->http_header,
+                                        opts->nameserver);
       if (!opts->wcard.conn_ok) {
         WSLOG("no connection to %s, skipping\n", targets[t]);
         free(targets[t]);
@@ -850,7 +882,7 @@ void launch_attack(opts_T *opts)
   }
 
   clock_gettime(CLOCK_MONOTONIC, &g_t_end);
-  kill_locks();
+  /* locks are destroyed in cleanup_http() after curl_share_cleanup() */
 
   {
     int f;

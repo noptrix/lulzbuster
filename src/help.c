@@ -53,7 +53,8 @@ void usage()
   "                   multi codes separated by ',')\n"
   "  -f             - follow http redirects. hint: better try appending a '/'\n"
   "                   with '-A' option first instead of using '-f'\n"
-  "  -F <num>       - num level to follow http redirects (default: 0)\n"
+  "  -F <num>       - num level to follow http redirects (default: -1 = "
+  "unlimited)\n"
   "  -u <str>       - user-agent string (default: built-in windows edge)\n"
   "  -U             - use random built-in user-agents\n"
   "  -c <str>       - pass custom header(s) (e.g. 'Cookie: foo=bar; lol=lulz')\n"
@@ -73,8 +74,9 @@ void usage()
   "                   (default: none)\n\n"
   HD("tuning options")
   "  -t <num>       - num threads for concurrent scanning (default: 35)\n"
-  "  -g <num>       - num connection cache size for curl (default: 35)\n"
-  "                   note: this value should always equal to -t's value\n\n"
+  "  -g <num>       - per-thread connection cache size for curl (default: 35)\n"
+  "                   note: each worker thread keeps its own cache; 1 conn\n"
+  "                   per host suffices, higher only helps across many hosts\n\n"
   HD("wordlist options")
   "  -w <file>      - wordlist file\n"
   "                   (default: "DEF_WORDLIST")\n"

@@ -238,10 +238,16 @@ url_T parse_url(const char *);
  * cert/key/key_pass enable mTLS on probes (else mTLS-protected
  * targets would 403 every probe and the scan would never start).
  * conn_timeout mirrors opts->conn_timeout (-C) so probes don't hang
- * 5x the user-set timeout against unreachable hosts */
+ * 5x the user-set timeout against unreachable hosts. useragent,
+ * http_method, http_header and nameserver mirror -u/-U, -h, -c and -n
+ * so the probes look like the real scan workers - otherwise a target
+ * that answers differently per UA/method/vhost header would produce a
+ * wildcard fingerprint the workers never match. any of them may be
+ * NULL to fall back to curl's defaults */
 wildcard_T check_conn_wildcard(const char *, const char *, const char *,
                                bool, const char *, const char *,
-                               const char *, long);
+                               const char *, long, const char *,
+                               const char *, const char *, const char *);
 
 
 #endif

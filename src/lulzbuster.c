@@ -177,7 +177,11 @@ int main(int argc, char *argv[])
   opts->wcard = check_conn_wildcard(opts->start_url, opts->proxy,
                                     opts->proxy_creds, opts->in_ssl,
                                     opts->cert_file, opts->key_file,
-                                    opts->key_pass, opts->conn_timeout);
+                                    opts->key_pass, opts->conn_timeout,
+                                    opts->rand_ua ? get_rand_useragent()
+                                                  : opts->useragent,
+                                    opts->http_method, opts->http_header,
+                                    opts->nameserver);
   if (!opts->wcard.conn_ok) {
     ESLOG("could not connect to: %s\n", opts->start_url);
     free_lulzbuster(opts);

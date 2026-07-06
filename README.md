@@ -37,7 +37,7 @@ http options
                    multi codes separated by ',')
   -f             - follow http redirects. hint: better try appending a '/'
                    with '-A' option first instead of using '-f'
-  -F <num>       - num level to follow http redirects (default: 0)
+  -F <num>       - num level to follow http redirects (default: -1 = unlimited)
   -u <str>       - user-agent string (default: built-in windows edge)
   -U             - use random built-in user-agents
   -c <str>       - pass custom header(s) (e.g. 'Cookie: foo=bar; lol=lulz')
@@ -62,9 +62,10 @@ timeout options
 
 tuning options
 
-  -t <num>       - num threads for concurrent scanning (default: 30)
-  -g <num>       - num connection cache size for curl (default: 30)
-                   note: this value should always equal to -t's value
+  -t <num>       - num threads for concurrent scanning (default: 35)
+  -g <num>       - per-thread connection cache size for curl (default: 35)
+                   note: each worker thread keeps its own cache; 1 conn
+                   per host suffices, higher only helps across many hosts
 
 wordlist options
 

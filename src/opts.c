@@ -292,11 +292,10 @@ bool set_http_options(opts_T *opts)
     err(E_CURLSH_SSL);
     return false;
   }
-  if (curl_share_setopt(opts->curl->sh, CURLSHOPT_SHARE,
-                        CURL_LOCK_DATA_CONNECT) != CURLSHE_OK) {
-    err(E_CURLSH_CONN);
-    return false;
-  }
+  /* NOTE: we deliberately do NOT share CURL_LOCK_DATA_CONNECT. sharing the
+   * connection cache across our worker threads races inside libcurl's reuse
+   * path and segfaults (NULL deref). DNS + SSL session sharing stay on;
+   * each worker reuses its own keep-alive connections */
   if (curl_share_setopt(opts->curl->sh, CURLSHOPT_LOCKFUNC, lock_cb) != \
       CURLSHE_OK) {
     err(E_CURLSH_LF);

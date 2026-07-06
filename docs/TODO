@@ -31,6 +31,35 @@ ChangeLog and TODO list for lulzbuster
       migrate from manual thread pool to libcurl multi interface
 
 
+===> 2.0.1
+
+  [x] bugfix
+      fix multithreaded SIGSEGV: shared connection cache
+      (CURL_LOCK_DATA_CONNECT) raced across workers. dropped the CONNECT
+      share (opts.c) and gave each thread one persistent easy handle via
+      pthread_key (attack.c) to keep per-thread connection reuse
+  [x] bugfix
+      fix shutdown use-of-destroyed-mutex on the curl share locks (found
+      via TSan). thpool.c: workers are now joinable + pthread_join'd in
+      thpool_destroy so no thread outlives teardown. http.c: destroy the
+      share locks in cleanup_http() AFTER curl_share_cleanup() (which
+      still calls lock_cb), guarded so early-exit paths stay no-op
+  [x] update
+      refreshed built-in UA list to current versions (149 -> 175), pulled
+      from vendor APIs: chrome/edge 150, firefox 152/esr 140, safari 26.5,
+      ios 26.5, android 17. default UA bumped to newest edge (150)
+  [x] update
+      http.c: wildcard probes now mirror the workers (-u/-U ua, -h method,
+      -c header, -n nameserver) so fingerprints match
+  [x] bugfix
+      thpool.c: removed leftover git merge conflict markers in a comment
+  [x] bugfix
+      opts.h: fixed stale option letters in opts_T field comments
+  [x] bugfix
+      help/README/manpage: -F default is -1 (unlimited), was doc'd as 0;
+      -t/-g default is 35, was doc'd as 30; clarified -g is per-thread now
+
+
 ===> 2.0.0
 
   [x] new feature

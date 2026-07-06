@@ -51,7 +51,7 @@
 
 
 /* lulzbuster version */
-#define VERSION "lulzbuster v2.0.0"
+#define VERSION "lulzbuster v2.0.1"
 
 
 /*******************************************************************************
